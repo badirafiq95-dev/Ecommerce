@@ -1,0 +1,5 @@
+.env.local
+.env*.local
+firebase-service-account.json
+.next
+node_modules

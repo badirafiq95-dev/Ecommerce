@@ -1,0 +1,74 @@
+[
+  {
+    "id": "single-001",
+    "name": "Holo Dragon V Star",
+    "category": "Singles",
+    "price": 1299,
+    "stock": 6,
+    "image": "/images/hero-cards.png",
+    "tag": "Near Mint"
+  },
+  {
+    "id": "single-002",
+    "name": "Silver Foil Trainer",
+    "category": "Singles",
+    "price": 499,
+    "stock": 12,
+    "image": "/images/hero-cards.png",
+    "tag": "Popular"
+  },
+  {
+    "id": "sealed-001",
+    "name": "Collector Booster Pack",
+    "category": "Sealed",
+    "price": 699,
+    "stock": 18,
+    "image": "/images/hero-cards.png",
+    "tag": "Fresh Stock"
+  },
+  {
+    "id": "sealed-002",
+    "name": "Premium Deck Box Set",
+    "category": "Sealed",
+    "price": 2199,
+    "stock": 4,
+    "image": "/images/hero-cards.png",
+    "tag": "Limited"
+  },
+  {
+    "id": "graded-001",
+    "name": "Gem Mint Foil Slab",
+    "category": "Graded",
+    "price": 5499,
+    "stock": 2,
+    "image": "/images/hero-cards.png",
+    "tag": "PSA Style"
+  },
+  {
+    "id": "graded-002",
+    "name": "Vintage Rare Slab",
+    "category": "Graded",
+    "price": 7999,
+    "stock": 1,
+    "image": "/images/hero-cards.png",
+    "tag": "Collector Pick"
+  },
+  {
+    "id": "supplies-001",
+    "name": "Soft Sleeves Pack",
+    "category": "Supplies",
+    "price": 199,
+    "stock": 40,
+    "image": "/images/hero-cards.png",
+    "tag": "100 Count"
+  },
+  {
+    "id": "supplies-002",
+    "name": "Top Loader Bundle",
+    "category": "Supplies",
+    "price": 349,
+    "stock": 25,
+    "image": "/images/hero-cards.png",
+    "tag": "Protective"
+  }
+]

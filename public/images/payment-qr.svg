@@ -1,0 +1,9 @@
+<svg width="240" height="240" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="240" height="240" rx="18" fill="#ffffff"/>
+  <rect x="13" y="13" width="214" height="214" rx="14" fill="#f4f7f5"/>
+  <g fill="#111815">
+    <path d="M30 30h54v54H30V30Zm12 12v30h30V42H42ZM156 30h54v54h-54V30Zm12 12v30h30V42h-30ZM30 156h54v54H30v-54Zm12 12v30h30v-30H42Z"/>
+    <path d="M102 30h12v12h-12V30Zm24 0h12v24h-12V30Zm-24 36h36v12h-36V66Zm48 36h12v12h-12v-12Zm-60 0h48v12H90v-12Zm84 0h36v12h-36v-12Zm-84 24h12v36H90v-36Zm24 0h12v12h-12v-12Zm36 0h24v12h-24v-12Zm48 0h12v48h-12v-48Zm-84 24h48v12h-48v-12Zm60 0h12v12h-12v-12Zm-72 24h12v36h-12v-36Zm24 0h36v12h-36v-12Zm48 0h36v12h-36v-12Zm-36 24h12v12h-12v-12Zm36 0h12v12h-12v-12Z"/>
+  </g>
+  <text x="120" y="124" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#111815">PAY</text>
+</svg>
