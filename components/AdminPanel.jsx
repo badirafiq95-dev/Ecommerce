@@ -1,7 +1,9 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Check,
   CircleAlert,
@@ -46,11 +48,13 @@ function readImageFile(file) {
 }
 
 export function AdminPanel() {
-  const [isAuthed, setIsAuthed] = useState(false);
+  const router = useRouter();
+  const [isAuthed, setIsAuthed] = useState(() => getAdminSession());
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [secretEntry, setSecretEntry] = useState(false);
   const [saveStatus, setSaveStatus] = useState("");
   const [newCategory, setNewCategory] = useState("");
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
@@ -68,6 +72,11 @@ export function AdminPanel() {
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
     setIsAuthed(getAdminSession());
     setOrders(readOrders());
+    if (window.sessionStorage.getItem("mint-lane-secret-admin-entry") === "true") {
+      setSecretEntry(true);
+      window.sessionStorage.removeItem("mint-lane-secret-admin-entry");
+      window.setTimeout(() => setSecretEntry(false), 1400);
+    }
   }, []);
 
   useEffect(() => {
@@ -120,9 +129,8 @@ export function AdminPanel() {
     setIsLoggingOut(true);
     window.setTimeout(() => {
       setAdminSession(false);
-      setIsAuthed(false);
-      setIsLoggingOut(false);
-    }, 1300);
+      router.replace("/");
+    }, 1850);
   };
 
   const handleAddProduct = async (event) => {
@@ -185,8 +193,8 @@ export function AdminPanel() {
 
   if (!isAuthed) {
     return (
-      <main className="admin-login-shell">
-        <section className="admin-login-card">
+      <main className={`admin-login-shell ${secretEntry ? "is-secret-entry" : ""}`}>
+        <section className={`admin-login-card ${secretEntry ? "is-secret-entry" : ""}`}>
           <div className="admin-badge">
             <ShieldCheck size={22} />
           </div>
@@ -246,20 +254,156 @@ export function AdminPanel() {
     );
   }
 
-  return (
-    <main className="admin-dashboard">
-      {isLoggingOut ? (
-        <div className="logout-overlay" aria-live="polite">
-          <div className="logout-card">
-            <div className="logout-icon">
-              <LogOut size={42} />
+  const logoutOverlay =
+    isLoggingOut && typeof document !== "undefined"
+      ? createPortal(
+          <div className="logout-overlay" aria-live="polite">
+            <div className="logout-card">
+              <div className="logout-icon">
+                <LogOut size={42} />
+              </div>
+              <p className="eyebrow">Secure exit</p>
+              <h2>Logging Out</h2>
+              <span>Returning to home page...</span>
             </div>
-            <p className="eyebrow">Secure exit</p>
-            <h2>Logging out</h2>
-            <span>Returning to admin login...</span>
-          </div>
-        </div>
-      ) : null}
+          </div>,
+          document.body
+        )
+      : null;
+
+  const ordersModal =
+    ordersView && typeof document !== "undefined"
+      ? createPortal(
+          <div className="orders-modal-backdrop">
+            <section className="orders-modal" aria-label="Order requests">
+              <div className="orders-modal-head">
+                <div>
+                  <p className="eyebrow">Order manager</p>
+                  <h2>{ordersView === "rejected" ? "Rejected orders" : "Customer orders"}</h2>
+                </div>
+                <div className="orders-modal-actions">
+                  <button
+                    className={`clear-orders-button ${ordersView === "rejected" ? "danger-clear" : "soft-clear"}`}
+                    type="button"
+                    onClick={handleClearOrders}
+                    disabled={visibleOrders.length === 0 || isClearingOrders}
+                  >
+                    <Trash2 size={17} />
+                    {isClearingOrders ? "Clearing" : "Clear All"}
+                  </button>
+                  {clearMessage ? <span className="clear-success">{clearMessage}</span> : null}
+                  <button className="icon-button" type="button" onClick={() => setOrdersView("")} aria-label="Close orders">
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+              <div className="orders-list">
+                {visibleOrders.length === 0 ? (
+                  <p className="empty-cart">
+                    {ordersView === "rejected"
+                      ? "No rejected orders yet."
+                      : "No active orders yet. New checkout requests will appear here automatically."}
+                  </p>
+                ) : (
+                  visibleOrders.map((order, index) => (
+                    <article className={`order-card ${isClearingOrders ? "is-clearing" : ""}`} key={order.id}>
+                      <div className="order-card-head">
+                        <div className="order-card-title">
+                          <span className="order-index-badge">{index + 1}</span>
+                          <div>
+                            <strong>
+                              Order {index + 1} - <span className="order-id-label">Order ID:</span> {order.id}
+                            </strong>
+                            <span>Order Time: {new Date(order.createdAt).toLocaleString()}</span>
+                          </div>
+                        </div>
+                        <span
+                          className={`stock-pill ${
+                            order.status === "Rejected" || order.status === "Cancelled" ? "rejected-status" : "in-stock"
+                          }`}
+                        >
+                          {order.status === "Cancelled" ? "Rejected" : order.status}
+                        </span>
+                      </div>
+                      <div className="order-customer-grid">
+                        <span>
+                          <small>Customer Name</small>
+                          <strong>{order.customerName}</strong>
+                        </span>
+                        <span>
+                          <small>Email ID</small>
+                          <strong>{order.email}</strong>
+                        </span>
+                        <span>
+                          <small>Phone</small>
+                          <strong>{order.phone}</strong>
+                        </span>
+                      </div>
+                      <div className="order-address">
+                        <small>Address</small>
+                        <p>{order.address}</p>
+                      </div>
+                      {order.paymentScreenshot?.dataUrl ? (
+                        <a className="order-attachment" href={order.paymentScreenshot.dataUrl} target="_blank" rel="noreferrer">
+                          <img src={order.paymentScreenshot.dataUrl} alt={`Payment screenshot for ${order.id}`} />
+                          <span>
+                            <small>Payment Screenshot Attachment</small>
+                            <strong>{order.paymentScreenshot.name || "View uploaded screenshot"}</strong>
+                          </span>
+                        </a>
+                      ) : (
+                        <div className="order-attachment is-empty">
+                          <span>
+                            <small>Payment Screenshot Attachment</small>
+                            <strong>No screenshot attached</strong>
+                          </span>
+                        </div>
+                      )}
+                      <div className="order-items">
+                        {order.items.map((item) => (
+                          <div className="order-item" key={`${order.id}-${item.id}`}>
+                            <span>{item.name} x {item.quantity}</span>
+                            <strong>{formatPrice(item.price * item.quantity)}</strong>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="total-row">
+                        <span>Total</span>
+                        <strong>{formatPrice(order.total)}</strong>
+                      </div>
+                      <div className="order-actions">
+                        <button
+                          className="approve-button"
+                          type="button"
+                          onClick={() => approveOrder(order.id)}
+                          disabled={order.status === "Approved" || order.status === "Rejected" || order.status === "Cancelled"}
+                        >
+                          Approve
+                        </button>
+                        <button
+                          className="reject-button"
+                          type="button"
+                          onClick={() => rejectOrder(order)}
+                          disabled={order.status === "Rejected" || order.status === "Cancelled"}
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </article>
+                  ))
+                )}
+              </div>
+            </section>
+          </div>,
+          document.body
+        )
+      : null;
+
+  return (
+    <>
+      {logoutOverlay}
+      {ordersModal}
+      <main className={`admin-dashboard ${isLoggingOut ? "is-logging-out" : ""}`}>
       <section className="admin-dashboard-head">
         <div>
           <p className="eyebrow">Private dashboard</p>
@@ -452,129 +596,7 @@ export function AdminPanel() {
         </div>
       </section>
 
-      {ordersView ? (
-        <div className="orders-modal-backdrop">
-          <section className="orders-modal" aria-label="Order requests">
-            <div className="orders-modal-head">
-              <div>
-                <p className="eyebrow">Order manager</p>
-                <h2>{ordersView === "rejected" ? "Rejected orders" : "Customer orders"}</h2>
-              </div>
-              <div className="orders-modal-actions">
-                <button
-                  className={`clear-orders-button ${ordersView === "rejected" ? "danger-clear" : "soft-clear"}`}
-                  type="button"
-                  onClick={handleClearOrders}
-                  disabled={visibleOrders.length === 0 || isClearingOrders}
-                >
-                  <Trash2 size={17} />
-                  {isClearingOrders ? "Clearing" : "Clear All"}
-                </button>
-                {clearMessage ? <span className="clear-success">{clearMessage}</span> : null}
-              <button className="icon-button" type="button" onClick={() => setOrdersView("")} aria-label="Close orders">
-                <X size={20} />
-              </button>
-              </div>
-            </div>
-            <div className="orders-list">
-              {visibleOrders.length === 0 ? (
-                <p className="empty-cart">
-                  {ordersView === "rejected"
-                    ? "No rejected orders yet."
-                    : "No active orders yet. New checkout requests will appear here automatically."}
-                </p>
-              ) : (
-                visibleOrders.map((order, index) => (
-                  <article className={`order-card ${isClearingOrders ? "is-clearing" : ""}`} key={order.id}>
-                    <div className="order-card-head">
-                      <div className="order-card-title">
-                        <span className="order-index-badge">{index + 1}</span>
-                        <div>
-                          <strong>
-                            Order {index + 1} - <span className="order-id-label">Order ID:</span> {order.id}
-                          </strong>
-                          <span>Order Time: {new Date(order.createdAt).toLocaleString()}</span>
-                        </div>
-                      </div>
-                      <span
-                        className={`stock-pill ${
-                          order.status === "Rejected" || order.status === "Cancelled" ? "rejected-status" : "in-stock"
-                        }`}
-                      >
-                        {order.status === "Cancelled" ? "Rejected" : order.status}
-                      </span>
-                    </div>
-                    <div className="order-customer-grid">
-                      <span>
-                        <small>Customer Name</small>
-                        <strong>{order.customerName}</strong>
-                      </span>
-                      <span>
-                        <small>Email ID</small>
-                        <strong>{order.email}</strong>
-                      </span>
-                      <span>
-                        <small>Phone</small>
-                        <strong>{order.phone}</strong>
-                      </span>
-                    </div>
-                    <div className="order-address">
-                      <small>Address</small>
-                      <p>{order.address}</p>
-                    </div>
-                    {order.paymentScreenshot?.dataUrl ? (
-                      <a className="order-attachment" href={order.paymentScreenshot.dataUrl} target="_blank" rel="noreferrer">
-                        <img src={order.paymentScreenshot.dataUrl} alt={`Payment screenshot for ${order.id}`} />
-                        <span>
-                          <small>Payment Screenshot Attachment</small>
-                          <strong>{order.paymentScreenshot.name || "View uploaded screenshot"}</strong>
-                        </span>
-                      </a>
-                    ) : (
-                      <div className="order-attachment is-empty">
-                        <span>
-                          <small>Payment Screenshot Attachment</small>
-                          <strong>No screenshot attached</strong>
-                        </span>
-                      </div>
-                    )}
-                    <div className="order-items">
-                      {order.items.map((item) => (
-                        <div className="order-item" key={`${order.id}-${item.id}`}>
-                          <span>{item.name} x {item.quantity}</span>
-                          <strong>{formatPrice(item.price * item.quantity)}</strong>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="total-row">
-                      <span>Total</span>
-                      <strong>{formatPrice(order.total)}</strong>
-                    </div>
-                    <div className="order-actions">
-                      <button
-                        className="approve-button"
-                        type="button"
-                        onClick={() => approveOrder(order.id)}
-                        disabled={order.status === "Approved" || order.status === "Rejected" || order.status === "Cancelled"}
-                      >
-                        Approve
-                      </button>
-                      <button
-                        className="reject-button"
-                        type="button"
-                        onClick={() => rejectOrder(order)}
-                        disabled={order.status === "Rejected" || order.status === "Cancelled"}
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  </article>
-                ))
-              )}
-            </div>
-          </section>
-        </div>
-      ) : null}
     </main>
+    </>
   );
 }
