@@ -7507,3 +7507,339 @@ h2 {
     height: 150px;
   }
 }
+
+/* Tablet-only layout safety layer. Desktop styles above remain unchanged. */
+@media (max-width: 1024px) {
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  img,
+  video {
+    max-width: 100%;
+    height: auto;
+  }
+
+  .site-header.demo-site-header {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 14px 18px;
+  }
+
+  .header-shop-tools,
+  .nav-links.demo-actions {
+    width: 100%;
+  }
+
+  .header-shop-tools {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .header-category-button,
+  .header-search,
+  .header-trust {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .header-trust,
+  .nav-links.demo-actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .demo-home .hero,
+  .hero,
+  .checkout-shell,
+  .flip-checkout-shell,
+  .customer-profile-shell,
+  .orders-page-shell,
+  .order-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .product-grid,
+  .category-grid,
+  .category-panel,
+  .subcategory-display,
+  .admin-stat-grid,
+  .customer-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+
+  .flip-price-sidebar {
+    position: static;
+  }
+}
+
+/* Mobile-only layout safety layer. Desktop styles above remain unchanged. */
+@media (max-width: 768px) {
+  html,
+  body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  img,
+  video,
+  canvas {
+    max-width: 100%;
+    height: auto;
+  }
+
+  .site-header.demo-site-header {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    min-height: auto;
+    padding: 12px 14px;
+  }
+
+  .demo-brand {
+    min-width: 0;
+  }
+
+  .demo-brand a {
+    overflow: hidden;
+    max-width: 145px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .header-shop-tools,
+  .nav-links.demo-actions {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .header-shop-tools {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    order: 3;
+  }
+
+  .header-trust {
+    display: none;
+  }
+
+  .header-category-button {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .header-search {
+    width: 100%;
+    min-height: 44px;
+    padding-left: 14px;
+  }
+
+  .nav-links.demo-actions {
+    display: flex;
+    order: 4;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding-top: 2px;
+  }
+
+  .profile-menu,
+  .profile-menu-link,
+  .demo-cart-button {
+    width: 100%;
+  }
+
+  .profile-menu-link,
+  .demo-cart-button {
+    justify-content: start;
+    min-height: 46px;
+    padding: 0 12px;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(205, 217, 214, 0.9);
+    border-radius: 8px;
+  }
+
+  .profile-dropdown {
+    right: auto;
+    left: 0;
+    width: min(100%, 320px);
+  }
+
+  .hero,
+  .demo-home .hero,
+  .checkout-shell,
+  .flip-checkout-shell,
+  .customer-profile-shell,
+  .orders-page-shell,
+  .order-detail-grid,
+  .admin-dashboard {
+    grid-template-columns: 1fr;
+    padding: 14px;
+  }
+
+  .demo-home .hero {
+    min-height: auto;
+  }
+
+  .hero-copy,
+  .demo-home .hero-copy,
+  .section-head,
+  .admin-card-head {
+    max-width: 100%;
+  }
+
+  h1 {
+    font-size: clamp(2.35rem, 12vw, 3.35rem);
+  }
+
+  h2 {
+    font-size: clamp(1.35rem, 7vw, 2rem);
+  }
+
+  .product-grid,
+  .category-grid,
+  .category-panel,
+  .subcategory-display,
+  .admin-stat-grid,
+  .customer-grid {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+  }
+
+  .product-card,
+  .customer-panel,
+  .customer-profile-panel,
+  .address-book-panel,
+  .profile-content-panel,
+  .orders-filter-panel,
+  .orders-page-card,
+  .order-detail-main-card,
+  .order-side-card,
+  .flip-price-sidebar section,
+  .checkout-step,
+  .account-auth-card {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .cart-drawer {
+    width: min(100vw, 420px);
+    padding: 16px;
+  }
+
+  .cart-item,
+  .orders-page-card,
+  .order-product-summary,
+  .checkout-summary-product,
+  .profile-order-row,
+  .profile-address-card,
+  .address-entry-grid,
+  .flip-address-grid,
+  .profile-field-grid,
+  .order-customer-grid,
+  .admin-add-form {
+    grid-template-columns: 1fr;
+  }
+
+  .orders-page-card {
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .orders-page-thumb,
+  .orders-page-fallback-image {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4 / 3;
+  }
+
+  .orders-page-search,
+  .profile-orders-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .orders-page-search button,
+  .primary-button,
+  .save-button,
+  .flip-save-deliver-button,
+  .flip-location-button,
+  .checkout-continue-button,
+  .checkout-submit-button,
+  .orders-shortcut-actions button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .flip-checkout-shell {
+    gap: 14px;
+  }
+
+  .flip-price-sidebar {
+    position: static;
+    gap: 14px;
+  }
+
+  .checkout-progress-card {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .checkout-progress-line {
+    width: 2px;
+    height: 22px;
+  }
+
+  .checkout-step > header,
+  .flip-address-form,
+  .checkout-selected-address-card,
+  .checkout-deliver-to,
+  .checkout-supercoins-row,
+  .checkout-summary-product,
+  .checkout-order-summary {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .checkout-selected-address-card,
+  .checkout-deliver-to,
+  .checkout-supercoins-row,
+  .customer-hero,
+  .admin-dashboard-head,
+  .order-card-head,
+  .order-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .checkout-summary-product small {
+    justify-content: flex-start;
+  }
+
+  .checkout-continue-button {
+    justify-self: stretch;
+    margin: 0 14px 18px;
+  }
+
+  .profile-sidebar,
+  .profile-content-panel,
+  .address-book-panel,
+  .notification-empty {
+    min-height: auto;
+  }
+
+  .admin-table-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .admin-table {
+    min-width: 720px;
+  }
+
+  .logout-card {
+    width: min(100%, 420px);
+    padding: 30px 18px;
+  }
+}
