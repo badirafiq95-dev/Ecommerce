@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Minus, Plus, X } from "lucide-react";
+import { CheckCircle2, Minus, Plus, TicketPercent, X } from "lucide-react";
 import { useState } from "react";
 import { useCustomerAuth } from "./CustomerAuthProvider";
 import { useCart } from "./CartProvider";
@@ -11,12 +11,29 @@ import { useProductCatalog } from "./useProductCatalog";
 import { formatPrice } from "../lib/format";
 
 export function CartDrawer() {
-  const { items, total, isOpen, setIsOpen, removeItem, updateQuantity, limitNotice, showLimitNotice } = useCart();
+  const {
+    items,
+    subtotal,
+    shippingCharge,
+    discountAmount,
+    total,
+    appliedCoupon,
+    couponNotice,
+    applyCoupon,
+    removeCoupon,
+    isOpen,
+    setIsOpen,
+    removeItem,
+    updateQuantity,
+    limitNotice,
+    showLimitNotice
+  } = useCart();
   const { user, loading: authLoading } = useCustomerAuth();
   const { products } = useProductCatalog();
   const router = useRouter();
   const [emptyNotice, setEmptyNotice] = useState(false);
   const [lineMotion, setLineMotion] = useState({});
+  const [couponCode, setCouponCode] = useState("");
 
   const getAvailableStock = (item) => {
     const currentProduct = products.find((product) => product.id === item.id);
@@ -86,6 +103,12 @@ export function CartDrawer() {
   const handleRemove = (item) => {
     playLineMotion(item.id, "removing");
     window.setTimeout(() => removeItem(item.id), 240);
+  };
+
+  const handleCouponSubmit = (event) => {
+    event.preventDefault();
+    const applied = applyCoupon(couponCode);
+    if (applied) setCouponCode("");
   };
 
   return (
@@ -177,9 +200,45 @@ export function CartDrawer() {
               <span>Add something to your cart before checkout.</span>
             </div>
           ) : null}
-          <div className="total-row">
-            <span>Total</span>
-            <strong>{formatPrice(total)}</strong>
+          <div className="cart-billing-card" aria-label="Billing details">
+            <div className="cart-billing-head">
+              <span><TicketPercent size={16} /> Billing</span>
+              {appliedCoupon ? <strong>{appliedCoupon.label}</strong> : null}
+            </div>
+            <div className="cart-billing-lines">
+              <p><span>Subtotal</span><strong>{formatPrice(subtotal)}</strong></p>
+              <p><span>Shipping charge</span><strong>{formatPrice(shippingCharge)}</strong></p>
+              {discountAmount > 0 ? (
+                <p className="cart-discount-line">
+                  <span>Coupon discount</span>
+                  <strong>-{formatPrice(discountAmount)}</strong>
+                </p>
+              ) : null}
+            </div>
+            <form className="cart-coupon-form" onSubmit={handleCouponSubmit}>
+              <label htmlFor="cart-coupon">Apply Coupon</label>
+              <div>
+                <input
+                  id="cart-coupon"
+                  value={couponCode}
+                  onChange={(event) => setCouponCode(event.target.value)}
+                  placeholder="MINT10"
+                  disabled={items.length === 0}
+                />
+                <button type="submit" disabled={items.length === 0}>Apply</button>
+              </div>
+            </form>
+            {couponNotice ? (
+              <p className={`cart-coupon-notice ${appliedCoupon ? "is-success" : ""}`} role="status">
+                {appliedCoupon ? <CheckCircle2 size={14} /> : null}
+                {couponNotice}
+                {appliedCoupon ? <button type="button" onClick={removeCoupon}>Remove</button> : null}
+              </p>
+            ) : null}
+            <div className="total-row cart-final-row">
+              <span>Total</span>
+              <strong>{formatPrice(total)}</strong>
+            </div>
           </div>
           <Link className="primary-button full" href="/checkout" onClick={handleProtectedCheckoutClick}>
             Checkout
