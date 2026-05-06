@@ -2607,6 +2607,158 @@ h2 {
   -webkit-touch-callout: none;
 }
 
+.cart-billing-card {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 15px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(239, 249, 246, 0.92)),
+    radial-gradient(circle at 100% 0%, rgba(15, 118, 110, 0.12), transparent 42%);
+  border: 1px solid rgba(15, 118, 110, 0.16);
+  border-radius: 8px;
+  box-shadow: 0 18px 44px rgba(17, 24, 21, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.86);
+}
+
+.cart-billing-head,
+.cart-billing-lines p,
+.cart-final-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cart-billing-head span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--accent-strong);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.cart-billing-head strong {
+  padding: 5px 8px;
+  color: #0f766e;
+  background: rgba(15, 118, 110, 0.08);
+  border: 1px solid rgba(15, 118, 110, 0.14);
+  border-radius: 999px;
+  font-size: 0.72rem;
+}
+
+.cart-billing-lines {
+  display: grid;
+  gap: 8px;
+}
+
+.cart-billing-lines p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.94rem;
+}
+
+.cart-billing-lines strong {
+  color: var(--ink);
+}
+
+.cart-discount-line span,
+.cart-discount-line strong {
+  color: #0f766e !important;
+}
+
+.cart-coupon-form {
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(15, 118, 110, 0.18);
+}
+
+.cart-coupon-form label {
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 850;
+}
+
+.cart-coupon-form div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.cart-coupon-form input {
+  min-width: 0;
+  height: 42px;
+  padding: 0 12px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(205, 217, 214, 0.92);
+  border-radius: 7px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  outline: none;
+}
+
+.cart-coupon-form input:focus {
+  border-color: rgba(15, 118, 110, 0.45);
+  box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.08);
+}
+
+.cart-coupon-form button {
+  min-width: 78px;
+  height: 42px;
+  color: white;
+  background: linear-gradient(135deg, #0f766e, #0b5d55);
+  border: 0;
+  border-radius: 7px;
+  font-weight: 900;
+  box-shadow: 0 12px 28px rgba(15, 118, 110, 0.18);
+}
+
+.cart-coupon-form button:disabled,
+.cart-coupon-form input:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.cart-coupon-notice {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: -2px 0 0;
+  color: #9f3a38;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.cart-coupon-notice.is-success {
+  color: #0f766e;
+}
+
+.cart-coupon-notice button {
+  margin-left: auto;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-decoration: underline;
+}
+
+.cart-final-row {
+  padding-top: 12px;
+  border-top: 1px solid rgba(15, 118, 110, 0.16);
+}
+
+.cart-final-row span,
+.cart-final-row strong {
+  font-size: 1.04rem;
+}
+
 .cart-empty-popover {
   position: absolute;
   left: 0;
@@ -3756,6 +3908,11 @@ h2 {
   border-top: 1px solid #dfe3e6;
   font-size: 1.15rem;
   font-weight: 900;
+}
+
+.flip-price-box .flip-discount-row,
+.flip-price-box .flip-discount-row strong {
+  color: #0f766e;
 }
 
 .flip-savings {
@@ -9221,5 +9378,367 @@ h2 {
     white-space: nowrap !important;
     font-size: clamp(0.76rem, 3.3vw, 0.88rem) !important;
     line-height: 1 !important;
+  }
+}
+
+/* Mobile profile dropdown fit: keep it fully inside the viewport. */
+@media (max-width: 768px) {
+  .demo-site-header:not(.is-admin-route) .profile-dropdown {
+    top: calc(100% + 8px) !important;
+    right: -6px !important;
+    left: auto !important;
+    width: min(68vw, 252px) !important;
+    padding: 8px !important;
+    border-radius: 8px !important;
+    transform-origin: top right !important;
+  }
+
+  .demo-site-header:not(.is-admin-route) .profile-dropdown a,
+  .demo-site-header:not(.is-admin-route) .profile-dropdown button,
+  .demo-site-header:not(.is-admin-route) .profile-dropdown span {
+    min-height: 42px !important;
+    padding: 0 10px !important;
+    font-size: 0.92rem !important;
+    line-height: 1.1 !important;
+  }
+
+  .demo-site-header:not(.is-admin-route) .profile-dropdown-title {
+    min-height: 24px !important;
+    padding: 0 10px 4px !important;
+    font-size: 0.68rem !important;
+  }
+}
+
+/* Extra-tight mobile account menu so it stays under the profile icon. */
+@media (max-width: 768px) {
+  .demo-site-header:not(.is-admin-route) .profile-dropdown {
+    right: -8px !important;
+    left: auto !important;
+    width: min(50vw, 190px) !important;
+    padding: 7px !important;
+  }
+
+  .demo-site-header:not(.is-admin-route) .profile-dropdown a,
+  .demo-site-header:not(.is-admin-route) .profile-dropdown button,
+  .demo-site-header:not(.is-admin-route) .profile-dropdown span {
+    min-height: 38px !important;
+    padding: 0 9px !important;
+    font-size: 0.84rem !important;
+    white-space: nowrap !important;
+  }
+}
+
+/* Final mobile profile menu clamp: override desktop min-width and center it on-screen. */
+@media (max-width: 768px) {
+  .demo-site-header:not(.is-admin-route) .profile-dropdown {
+    position: fixed !important;
+    top: 78px !important;
+    right: auto !important;
+    left: 50% !important;
+    width: min(54vw, 210px) !important;
+    min-width: 0 !important;
+    max-width: calc(100vw - 34px) !important;
+    padding: 7px !important;
+    border-radius: 8px !important;
+    transform: translateX(-50%) translateY(-8px) scale(0.98) !important;
+    transform-origin: top center !important;
+  }
+
+  .demo-site-header:not(.is-admin-route) .profile-menu:hover .profile-dropdown {
+    transform: translateX(-50%) translateY(0) scale(1) !important;
+  }
+
+  .demo-site-header:not(.is-admin-route) .profile-dropdown a,
+  .demo-site-header:not(.is-admin-route) .profile-dropdown button,
+  .demo-site-header:not(.is-admin-route) .profile-dropdown span {
+    min-height: 36px !important;
+    padding: 0 8px !important;
+    font-size: 0.8rem !important;
+  }
+}
+
+/* Mobile account menu: reference-style compact list with icons and soft motion. */
+@media (max-width: 768px) {
+  .demo-site-header:not(.is-admin-route) .profile-dropdown {
+    top: 45px !important;
+    left: 50% !important;
+    width: min(48vw, 178px) !important;
+    min-width: 0 !important;
+    max-width: calc(100vw - 28px) !important;
+    padding: 6px 0 !important;
+    background: rgba(255, 255, 255, 0.96) !important;
+    border: 1px solid rgba(226, 232, 228, 0.9) !important;
+    border-radius: 4px !important;
+    box-shadow: 0 12px 32px rgba(17, 24, 21, 0.12) !important;
+    backdrop-filter: blur(12px) saturate(1.06) !important;
+    transform: translateX(-32%) translateY(-10px) scale(0.96) !important;
+    transition: opacity 170ms ease, transform 190ms cubic-bezier(0.2, 0.9, 0.2, 1) !important;
+  }
+
+  .demo-site-header:not(.is-admin-route) .profile-menu:hover .profile-dropdown {
+    transform: translateX(-32%) translateY(0) scale(1) !important;
+  }
+
+  .demo-site-header:not(.is-admin-route) .profile-dropdown-title {
+    display: none !important;
+  }
+
+  .demo-site-header:not(.is-admin-route) .profile-dropdown a,
+  .demo-site-header:not(.is-admin-route) .profile-dropdown button,
+  .demo-site-header:not(.is-admin-route) .profile-dropdown span:not(.profile-dropdown-title) {
+    display: grid !important;
+    grid-template-columns: 20px minmax(0, 1fr) !important;
+    gap: 9px !important;
+    align-items: center !important;
+    min-height: 39px !important;
+    padding: 0 12px !important;
+    color: #111815 !important;
+    font-size: 0.68rem !important;
+    font-weight: 750 !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+  }
+
+  .demo-site-header:not(.is-admin-route) .profile-dropdown a + a,
+  .demo-site-header:not(.is-admin-route) .profile-dropdown a + button,
+  .demo-site-header:not(.is-admin-route) .profile-dropdown button + button,
+  .demo-site-header:not(.is-admin-route) .profile-dropdown span + span,
+  .demo-site-header:not(.is-admin-route) .profile-dropdown span + button,
+  .demo-site-header:not(.is-admin-route) .profile-dropdown button + span {
+    border-top: 1px solid rgba(226, 232, 228, 0.9) !important;
+  }
+
+  .demo-site-header:not(.is-admin-route) .profile-dropdown a::before,
+  .demo-site-header:not(.is-admin-route) .profile-dropdown button::before,
+  .demo-site-header:not(.is-admin-route) .profile-dropdown span:not(.profile-dropdown-title)::before {
+    width: 17px;
+    height: 17px;
+    content: "";
+    background-color: #111815;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+    mask-repeat: no-repeat;
+    mask-position: center;
+    mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    -webkit-mask-size: contain;
+  }
+
+  .demo-site-header:not(.is-admin-route) .profile-dropdown span:nth-child(1)::before,
+  .demo-site-header:not(.is-admin-route) .profile-dropdown button:nth-child(2)::before {
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='black' stroke-width='2'%3E%3Ccircle cx='12' cy='8' r='4'/%3E%3Cpath d='M4 20c1.8-4 5-6 8-6s6.2 2 8 6'/%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3C/svg%3E");
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='black' stroke-width='2'%3E%3Ccircle cx='12' cy='8' r='4'/%3E%3Cpath d='M4 20c1.8-4 5-6 8-6s6.2 2 8 6'/%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3C/svg%3E");
+  }
+
+  .demo-site-header:not(.is-admin-route) .profile-dropdown span:nth-child(2)::before,
+  .demo-site-header:not(.is-admin-route) .profile-dropdown button:nth-child(3)::before {
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='black' stroke-width='2'%3E%3Cpath d='M6 8h12l-1 12H7L6 8Z'/%3E%3Cpath d='M9 8a3 3 0 0 1 6 0'/%3E%3C/svg%3E");
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='black' stroke-width='2'%3E%3Cpath d='M6 8h12l-1 12H7L6 8Z'/%3E%3Cpath d='M9 8a3 3 0 0 1 6 0'/%3E%3C/svg%3E");
+  }
+
+  .demo-site-header:not(.is-admin-route) .profile-dropdown span:nth-child(3)::before,
+  .demo-site-header:not(.is-admin-route) .profile-dropdown button:nth-child(4)::before {
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='black' stroke-width='2'%3E%3Cpath d='M6 4h12v17l-6-4-6 4V4Z'/%3E%3C/svg%3E");
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='black' stroke-width='2'%3E%3Cpath d='M6 4h12v17l-6-4-6 4V4Z'/%3E%3C/svg%3E");
+  }
+
+  .demo-site-header:not(.is-admin-route) .profile-dropdown span:nth-child(4)::before,
+  .demo-site-header:not(.is-admin-route) .profile-dropdown button:nth-child(5)::before {
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='black' stroke-width='2'%3E%3Cpath d='M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9'/%3E%3Cpath d='M10 21h4'/%3E%3C/svg%3E");
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='black' stroke-width='2'%3E%3Cpath d='M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9'/%3E%3Cpath d='M10 21h4'/%3E%3C/svg%3E");
+  }
+}
+
+.account-menu-icon {
+  display: none;
+}
+
+/* Final forced mobile account menu: real icons, compact width, visible animation. */
+@media (max-width: 768px) {
+  .demo-site-header:not(.is-admin-route) .profile-dropdown {
+    position: fixed !important;
+    top: 44px !important;
+    left: clamp(42px, 12vw, 54px) !important;
+    right: auto !important;
+    z-index: 200 !important;
+    width: 174px !important;
+    min-width: 0 !important;
+    max-width: calc(100vw - 84px) !important;
+    padding: 4px 0 !important;
+    overflow: hidden !important;
+    background: rgba(255, 255, 255, 0.97) !important;
+    border: 1px solid rgba(226, 232, 228, 0.94) !important;
+    border-radius: 5px !important;
+    box-shadow: 0 14px 34px rgba(17, 24, 21, 0.14) !important;
+    backdrop-filter: blur(14px) saturate(1.08) !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: translateY(-8px) scale(0.97) !important;
+    transform-origin: top center !important;
+    transition: opacity 170ms ease, transform 190ms cubic-bezier(0.2, 0.9, 0.2, 1) !important;
+  }
+
+  .demo-site-header:not(.is-admin-route) .profile-menu:hover .profile-dropdown {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    transform: translateY(0) scale(1) !important;
+  }
+
+  .demo-site-header:not(.is-admin-route) .profile-dropdown-title {
+    display: none !important;
+  }
+
+  .demo-site-header:not(.is-admin-route) .profile-dropdown a::before,
+  .demo-site-header:not(.is-admin-route) .profile-dropdown button::before,
+  .demo-site-header:not(.is-admin-route) .profile-dropdown span::before {
+    content: none !important;
+    display: none !important;
+  }
+
+  .demo-site-header:not(.is-admin-route) .profile-dropdown button,
+  .demo-site-header:not(.is-admin-route) .profile-dropdown span:not(.profile-dropdown-title) {
+    display: grid !important;
+    grid-template-columns: 18px minmax(0, 1fr) !important;
+    gap: 8px !important;
+    align-items: center !important;
+    width: 100% !important;
+    min-height: 38px !important;
+    padding: 0 11px !important;
+    color: #111815 !important;
+    background: rgba(255, 255, 255, 0.01) !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    font-size: 0.7rem !important;
+    font-weight: 760 !important;
+    line-height: 1 !important;
+    text-align: left !important;
+    white-space: nowrap !important;
+  }
+
+  .demo-site-header:not(.is-admin-route) .profile-dropdown button + button,
+  .demo-site-header:not(.is-admin-route) .profile-dropdown span + span {
+    border-top: 1px solid rgba(226, 232, 228, 0.92) !important;
+  }
+
+  .demo-site-header:not(.is-admin-route) .account-menu-icon {
+    display: block !important;
+    width: 16px !important;
+    height: 16px !important;
+    color: #111815 !important;
+    stroke-width: 1.8 !important;
+  }
+}
+
+/* Mobile account dropdown reference lock. Desktop header stays untouched. */
+@media (max-width: 768px) {
+  .demo-site-header:not(.is-admin-route) .profile-menu {
+    position: static !important;
+  }
+
+  .demo-site-header:not(.is-admin-route) .profile-dropdown {
+    position: fixed !important;
+    top: var(--profile-menu-top, 56px) !important;
+    left: var(--profile-menu-left, 43px) !important;
+    right: auto !important;
+    z-index: 240 !important;
+    display: grid !important;
+    box-sizing: border-box !important;
+    width: 260px !important;
+    min-width: 0 !important;
+    max-width: calc(100vw - 38px) !important;
+    padding: 18px 26px 16px !important;
+    overflow: visible !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+    border: 1px solid rgba(225, 232, 228, 0.96) !important;
+    border-radius: 6px !important;
+    box-shadow: 0 18px 42px rgba(17, 24, 21, 0.1) !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: translateY(-6px) scale(0.98) !important;
+    transform-origin: top left !important;
+    transition: opacity 160ms ease, transform 180ms cubic-bezier(0.2, 0.9, 0.2, 1) !important;
+  }
+
+  .demo-site-header:not(.is-admin-route) .profile-menu:hover .profile-dropdown,
+  .demo-site-header:not(.is-admin-route) .profile-menu:focus-within .profile-dropdown,
+  .demo-site-header:not(.is-admin-route) .profile-menu.is-profile-menu-open .profile-dropdown {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    transform: translateY(0) scale(1) !important;
+  }
+
+  .demo-site-header:not(.is-admin-route) .profile-menu.is-guest:hover .profile-dropdown,
+  .demo-site-header:not(.is-admin-route) .profile-menu.is-guest:focus-within .profile-dropdown,
+  .demo-site-header:not(.is-admin-route) .profile-menu.is-guest.is-profile-menu-open .profile-dropdown {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: translateY(-6px) scale(0.98) !important;
+  }
+
+  .demo-site-header:not(.is-admin-route) .profile-dropdown::before {
+    position: absolute !important;
+    top: -12px !important;
+    left: var(--profile-menu-notch-left, 170px) !important;
+    display: block !important;
+    width: 24px !important;
+    height: 24px !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+    border-top: 1px solid rgba(225, 232, 228, 0.96) !important;
+    border-left: 1px solid rgba(225, 232, 228, 0.96) !important;
+    content: "" !important;
+    transform: rotate(45deg) !important;
+  }
+
+  .demo-site-header:not(.is-admin-route) .profile-dropdown-title,
+  .demo-site-header:not(.is-admin-route) .profile-dropdown button:last-child {
+    display: none !important;
+  }
+
+  .demo-site-header:not(.is-admin-route) .profile-dropdown button,
+  .demo-site-header:not(.is-admin-route) .profile-dropdown span:not(.profile-dropdown-title) {
+    display: grid !important;
+    grid-template-columns: 36px minmax(0, 1fr) !important;
+    column-gap: 16px !important;
+    align-items: center !important;
+    width: 100% !important;
+    min-height: 64px !important;
+    padding: 0 !important;
+    color: #111815 !important;
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    font-family: Georgia, "Times New Roman", serif !important;
+    font-size: 1rem !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    text-align: left !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+  }
+
+  .demo-site-header:not(.is-admin-route) .profile-dropdown button + button,
+  .demo-site-header:not(.is-admin-route) .profile-dropdown span + span {
+    border-top: 1px solid rgba(226, 232, 228, 0.92) !important;
+  }
+
+  .demo-site-header:not(.is-admin-route) .profile-dropdown button:hover {
+    color: #0f766e !important;
+    background: rgba(15, 118, 110, 0.05) !important;
+  }
+
+  .demo-site-header:not(.is-admin-route) .profile-dropdown button::before,
+  .demo-site-header:not(.is-admin-route) .profile-dropdown span::before {
+    content: none !important;
+    display: none !important;
+  }
+
+  .demo-site-header:not(.is-admin-route) .account-menu-icon {
+    display: block !important;
+    width: 30px !important;
+    height: 30px !important;
+    color: var(--accent-strong) !important;
+    stroke-width: 1.6 !important;
   }
 }

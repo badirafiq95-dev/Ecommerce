@@ -85,7 +85,7 @@ function readPaymentScreenshot(file) {
 }
 
 export function CheckoutForm() {
-  const { items, total, clearCart } = useCart();
+  const { items, subtotal, shippingCharge, discountAmount, total, appliedCoupon, clearCart } = useCart();
   const { user, loading: authLoading } = useCustomerAuth();
   const { products, reduceStock } = useProductCatalog();
   const router = useRouter();
@@ -214,6 +214,13 @@ export function CheckoutForm() {
         address: addressLine,
         addressDetails: addressForm,
         total,
+        billing: {
+          subtotal,
+          shippingCharge,
+          discountAmount,
+          couponCode: appliedCoupon?.label || "",
+          total
+        },
         status: "Payment review",
         createdAt: new Date().toISOString(),
         paymentScreenshot,
@@ -407,10 +414,14 @@ export function CheckoutForm() {
         <section>
           <h2>Price Details</h2>
           <div className="flip-price-box">
-            <p><span>Price ({items.length} item{items.length === 1 ? "" : "s"})</span><strong>{formatPrice(total)}</strong></p>
+            <p><span>Price ({items.length} item{items.length === 1 ? "" : "s"})</span><strong>{formatPrice(subtotal)}</strong></p>
+            <p><span>Shipping charge</span><strong>{formatPrice(shippingCharge)}</strong></p>
+            {discountAmount > 0 ? (
+              <p className="flip-discount-row"><span>Coupon discount {appliedCoupon?.label ? `(${appliedCoupon.label})` : ""}</span><strong>-{formatPrice(discountAmount)}</strong></p>
+            ) : null}
             <p><span>Total Payable</span><strong>{formatPrice(total)}</strong></p>
           </div>
-          <p className="flip-savings">Your Total Savings on this order Rs. 0</p>
+          <p className="flip-savings">Your Total Savings on this order Rs. {discountAmount}</p>
         </section>
         <div className="flip-secure-note">
           <ShieldCheck size={38} />

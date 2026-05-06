@@ -4,17 +4,28 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 const CartContext = createContext(null);
 const STORAGE_KEY = "mint-lane-cart";
+const COUPON_STORAGE_KEY = "mint-lane-coupon";
+const SHIPPING_CHARGE = 150;
+const COUPONS = {
+  MINT10: { label: "MINT10", type: "percent", value: 10 },
+  SAVE100: { label: "SAVE100", type: "fixed", value: 100 },
+  LANE150: { label: "LANE150", type: "fixed", value: 150 }
+};
 
 export function CartProvider({ children }) {
   const [items, setItems] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const [ready, setReady] = useState(false);
   const [limitNotice, setLimitNotice] = useState(null);
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponNotice, setCouponNotice] = useState("");
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) setItems(JSON.parse(saved));
+      const savedCoupon = localStorage.getItem(COUPON_STORAGE_KEY);
+      if (savedCoupon && COUPONS[savedCoupon]) setAppliedCoupon(COUPONS[savedCoupon]);
     } finally {
       setReady(true);
     }
@@ -23,6 +34,15 @@ export function CartProvider({ children }) {
   useEffect(() => {
     if (ready) localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
   }, [items, ready]);
+
+  useEffect(() => {
+    if (!ready) return;
+    if (appliedCoupon) {
+      localStorage.setItem(COUPON_STORAGE_KEY, appliedCoupon.label);
+      return;
+    }
+    localStorage.removeItem(COUPON_STORAGE_KEY);
+  }, [appliedCoupon, ready]);
 
   const showLimitNotice = (product, maxStock) => {
     const token = Date.now();
@@ -79,25 +99,65 @@ export function CartProvider({ children }) {
     );
   };
 
-  const clearCart = () => setItems([]);
+  const applyCoupon = (code) => {
+    const normalizedCode = String(code || "").trim().toUpperCase();
+    const coupon = COUPONS[normalizedCode];
+
+    if (!coupon) {
+      setCouponNotice("Enter a valid coupon code.");
+      return false;
+    }
+
+    setAppliedCoupon(coupon);
+    setCouponNotice(`${coupon.label} applied successfully.`);
+    return true;
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponNotice("Coupon removed.");
+  };
+
+  const clearCart = () => {
+    setItems([]);
+    setAppliedCoupon(null);
+    setCouponNotice("");
+  };
 
   const value = useMemo(() => {
     const count = items.reduce((sum, item) => sum + item.quantity, 0);
-    const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const shippingCharge = items.length > 0 ? SHIPPING_CHARGE : 0;
+    const discountAmount = appliedCoupon
+      ? Math.min(
+          appliedCoupon.type === "percent"
+            ? Math.round((subtotal * appliedCoupon.value) / 100)
+            : appliedCoupon.value,
+          subtotal + shippingCharge
+        )
+      : 0;
+    const total = Math.max(0, subtotal + shippingCharge - discountAmount);
     return {
       items,
       count,
+      subtotal,
+      shippingCharge,
+      discountAmount,
       total,
+      appliedCoupon,
+      couponNotice,
       isOpen,
       setIsOpen,
       addItem,
       removeItem,
       updateQuantity,
       clearCart,
+      applyCoupon,
+      removeCoupon,
       limitNotice,
       showLimitNotice
     };
-  }, [items, isOpen, limitNotice]);
+  }, [items, isOpen, limitNotice, appliedCoupon, couponNotice]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

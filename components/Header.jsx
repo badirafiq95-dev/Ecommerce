@@ -2,7 +2,20 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ChevronDown, CircleUserRound, Grid2X2, LogOut, Search, ShieldCheck, ShoppingCart, Sparkles, Truck } from "lucide-react";
+import {
+  Bell,
+  Bookmark,
+  BriefcaseBusiness,
+  ChevronDown,
+  CircleUserRound,
+  Grid2X2,
+  LogOut,
+  Search,
+  ShieldCheck,
+  ShoppingCart,
+  Sparkles,
+  Truck
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useCart } from "./CartProvider";
@@ -19,7 +32,12 @@ export function Header() {
   const [adminShortcutExiting, setAdminShortcutExiting] = useState(false);
   const [secretOpening, setSecretOpening] = useState(false);
   const [isCustomerLoggingOut, setIsCustomerLoggingOut] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [profileMenuStyle, setProfileMenuStyle] = useState({});
   const secretClickRef = useRef({ count: 0, timer: null });
+  const profileMenuRef = useRef(null);
+  const profileTriggerRef = useRef(null);
+  const profilePointerHandledRef = useRef(false);
 
   useEffect(() => {
     const syncAdminShortcut = () => {
@@ -34,6 +52,54 @@ export function Header() {
       window.removeEventListener("mint-lane-admin-session-updated", syncAdminShortcut);
     };
   }, []);
+
+  useEffect(() => {
+    setIsProfileMenuOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!isProfileMenuOpen) return undefined;
+
+    const updateProfileMenuPosition = () => {
+      const trigger = profileTriggerRef.current;
+      if (!trigger || !window.matchMedia("(max-width: 768px)").matches) return;
+
+      const rect = trigger.getBoundingClientRect();
+      const menuWidth = 230;
+      const notchSize = 24;
+      const notchCenter = rect.left + rect.width / 2;
+      const left = Math.min(
+        Math.max(notchCenter - 200, 16),
+        window.innerWidth - menuWidth - 16
+      );
+      const top = rect.bottom + 13;
+
+      setProfileMenuStyle({
+        "--profile-menu-left": `${left}px`,
+        "--profile-menu-top": `${top}px`,
+        "--profile-menu-notch-left": `${notchCenter - left - notchSize / 2}px`
+      });
+    };
+
+    const handlePointerDown = (event) => {
+      if (profileMenuRef.current?.contains(event.target)) return;
+      setIsProfileMenuOpen(false);
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") setIsProfileMenuOpen(false);
+    };
+
+    updateProfileMenuPosition();
+    window.addEventListener("resize", updateProfileMenuPosition);
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("resize", updateProfileMenuPosition);
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isProfileMenuOpen]);
 
   const handleSecretAdminTap = () => {
     if (adminShortcutActive) {
@@ -124,7 +190,58 @@ export function Header() {
     router.push(`/account?view=profile&section=${section}`);
   };
 
-  const handleProfileTriggerClick = () => {
+  const positionMobileProfileMenu = (trigger) => {
+    const rect = trigger.getBoundingClientRect();
+    const menuWidth = 260;
+    const notchSize = 24;
+    const notchCenter = rect.left + rect.width / 2;
+    const left = Math.min(
+      Math.max(notchCenter - 200, 16),
+      window.innerWidth - menuWidth - 16
+    );
+    const top = rect.bottom + 13;
+
+    setProfileMenuStyle({
+      "--profile-menu-left": `${left}px`,
+      "--profile-menu-top": `${top}px`,
+      "--profile-menu-notch-left": `${notchCenter - left - notchSize / 2}px`
+    });
+  };
+
+  const handleProfileTriggerPointerDown = (event) => {
+    if (!window.matchMedia("(max-width: 768px)").matches || event.pointerType === "mouse") return;
+
+    event.preventDefault();
+    profilePointerHandledRef.current = true;
+
+    if (!user) {
+      setIsProfileMenuOpen(false);
+      router.push("/account?next=/");
+      return;
+    }
+
+    positionMobileProfileMenu(event.currentTarget);
+    setIsProfileMenuOpen((current) => !current);
+  };
+
+  const handleProfileTriggerClick = (event) => {
+    if (profilePointerHandledRef.current) {
+      profilePointerHandledRef.current = false;
+      return;
+    }
+
+    if (window.matchMedia("(max-width: 768px)").matches) {
+      if (!user) {
+        setIsProfileMenuOpen(false);
+        router.push("/account?next=/");
+        return;
+      }
+
+      positionMobileProfileMenu(event.currentTarget);
+      setIsProfileMenuOpen((current) => !current);
+      return;
+    }
+
     if (!user) router.push("/account");
   };
 
@@ -180,8 +297,22 @@ export function Header() {
         </div>
       </div>
       <nav className="nav-links demo-actions" aria-label="Primary navigation">
-        <div className={`profile-menu ${user ? "is-customer-logged-in" : "is-guest"}`}>
-          <button className="demo-icon-link profile-menu-link" type="button" onClick={handleProfileTriggerClick} aria-label="Account menu">
+        <div
+          className={`profile-menu ${user ? "is-customer-logged-in" : "is-guest"} ${
+            isProfileMenuOpen ? "is-profile-menu-open" : ""
+          }`}
+          ref={profileMenuRef}
+          style={profileMenuStyle}
+        >
+          <button
+            className="demo-icon-link profile-menu-link"
+            type="button"
+            onPointerDown={handleProfileTriggerPointerDown}
+            onClick={handleProfileTriggerClick}
+            aria-label="Account menu"
+            aria-expanded={isProfileMenuOpen}
+            ref={profileTriggerRef}
+          >
             <CircleUserRound size={29} strokeWidth={1.8} />
             <span>{profileFirstName}</span>
             <ChevronDown size={16} strokeWidth={2} />
@@ -190,18 +321,45 @@ export function Header() {
             {user ? (
               <>
                 <span className="profile-dropdown-title">Your Account</span>
-                <button type="button" onClick={handleProfileOpen}>My Profile</button>
-                <button type="button" onClick={handleOrdersOpen}>Orders</button>
-                <button type="button" onClick={() => handleProfileSectionOpen("addresses")}>Saved addresses</button>
-                <button type="button" onClick={() => handleProfileSectionOpen("notifications")}>Notification</button>
-                <button type="button" onClick={handleLogout}>{isCustomerLoggingOut ? "Logging out..." : "Logout"}</button>
+                <button type="button" onClick={handleProfileOpen}>
+                  <CircleUserRound className="account-menu-icon" size={17} strokeWidth={1.8} aria-hidden="true" />
+                  My Profile
+                </button>
+                <button type="button" onClick={handleOrdersOpen}>
+                  <BriefcaseBusiness className="account-menu-icon" size={17} strokeWidth={1.8} aria-hidden="true" />
+                  Orders
+                </button>
+                <button type="button" onClick={() => handleProfileSectionOpen("addresses")}>
+                  <Bookmark className="account-menu-icon" size={17} strokeWidth={1.8} aria-hidden="true" />
+                  Saved addresses
+                </button>
+                <button type="button" onClick={() => handleProfileSectionOpen("notifications")}>
+                  <Bell className="account-menu-icon" size={17} strokeWidth={1.8} aria-hidden="true" />
+                  Notification
+                </button>
+                <button type="button" onClick={handleLogout}>
+                  <LogOut className="account-menu-icon" size={17} strokeWidth={1.8} aria-hidden="true" />
+                  {isCustomerLoggingOut ? "Logging out..." : "Logout"}
+                </button>
               </>
             ) : (
               <>
-                <span>My Profile</span>
-                <span>Orders</span>
-                <span>Saved addresses</span>
-                <span>Notification</span>
+                <span>
+                  <CircleUserRound className="account-menu-icon" size={17} strokeWidth={1.8} aria-hidden="true" />
+                  My Profile
+                </span>
+                <span>
+                  <BriefcaseBusiness className="account-menu-icon" size={17} strokeWidth={1.8} aria-hidden="true" />
+                  Orders
+                </span>
+                <span>
+                  <Bookmark className="account-menu-icon" size={17} strokeWidth={1.8} aria-hidden="true" />
+                  Saved addresses
+                </span>
+                <span>
+                  <Bell className="account-menu-icon" size={17} strokeWidth={1.8} aria-hidden="true" />
+                  Notification
+                </span>
               </>
             )}
           </div>
