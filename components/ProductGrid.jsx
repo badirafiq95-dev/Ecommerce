@@ -13,8 +13,8 @@ export function ProductGrid({ products: initialProducts }) {
 
   return (
     <div className="product-grid">
-      {visibleProducts.map((product) => (
-        <article className="product-card reveal" key={product.id}>
+      {visibleProducts.map((product, index) => (
+        <article className="product-card reveal" data-reveal-delay={`${Math.min(index % 4, 3) * 70}ms`} key={product.id}>
           <div className="product-image">
             <Image
               src={product.image}

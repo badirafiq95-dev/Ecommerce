@@ -1,6 +1,7 @@
 import "./globals.css";
 import { CartProvider } from "../components/CartProvider";
 import { CustomerAuthProvider } from "../components/CustomerAuthProvider";
+import { PremiumMotion } from "../components/PremiumMotion";
 
 export const metadata = {
   title: "Mint Lane Cards",
@@ -12,7 +13,10 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body>
         <CustomerAuthProvider>
-          <CartProvider>{children}</CartProvider>
+          <CartProvider>
+            <PremiumMotion />
+            {children}
+          </CartProvider>
         </CustomerAuthProvider>
       </body>
     </html>
