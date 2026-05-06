@@ -146,7 +146,7 @@ export function Header() {
       : null;
 
   return (
-    <header className="site-header demo-site-header">
+    <header className={`site-header demo-site-header ${pathname === "/admin" ? "is-admin-route" : ""}`}>
       {customerLogoutOverlay}
       <div className="brand demo-brand" aria-label="Mint Lane">
         <button
