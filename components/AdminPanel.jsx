@@ -17,11 +17,13 @@ import {
   RotateCcw,
   ShieldCheck,
   Store,
+  TicketPercent,
   Trash2,
   WalletCards,
   X
 } from "lucide-react";
 import { formatPrice } from "../lib/format";
+import { APPLIED_COUPON_STORAGE_KEY, normalizeCouponCode, readCoupons, saveCoupons } from "../lib/coupons";
 import { getAdminSession, setAdminSession, startAdminAccessExit } from "../lib/adminSession";
 import { clearActiveOrders, clearRejectedOrders, readOrders, updateOrderStatus } from "../lib/orders";
 import { sendOrderEmail } from "../lib/orderEmail";
@@ -62,6 +64,13 @@ export function AdminPanel() {
   const [ordersView, setOrdersView] = useState("");
   const [isClearingOrders, setIsClearingOrders] = useState(false);
   const [clearMessage, setClearMessage] = useState("");
+  const [coupons, setCoupons] = useState([]);
+  const [isCouponPanelOpen, setIsCouponPanelOpen] = useState(false);
+  const [isCouponFormOpen, setIsCouponFormOpen] = useState(false);
+  const [couponDraft, setCouponDraft] = useState({ code: "", type: "percent", value: "" });
+  const [couponMessage, setCouponMessage] = useState("");
+  const [isRemovingCoupons, setIsRemovingCoupons] = useState(false);
+  const [removingCouponId, setRemovingCouponId] = useState("");
   const { products, stats, updateProduct, adjustPrice, addProduct, removeProduct, resetProducts, saveChanges, restoreStock } =
     useProductCatalog();
   const rejectedOrders = orders.filter((order) => order.status === "Rejected" || order.status === "Cancelled");
@@ -72,11 +81,22 @@ export function AdminPanel() {
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
     setIsAuthed(getAdminSession());
     setOrders(readOrders());
+    setCoupons(readCoupons());
     if (window.sessionStorage.getItem("mint-lane-secret-admin-entry") === "true") {
       setSecretEntry(true);
       window.sessionStorage.removeItem("mint-lane-secret-admin-entry");
       window.setTimeout(() => setSecretEntry(false), 1400);
     }
+  }, []);
+
+  useEffect(() => {
+    const syncCoupons = () => setCoupons(readCoupons());
+    window.addEventListener("mint-lane-coupons-updated", syncCoupons);
+    window.addEventListener("storage", syncCoupons);
+    return () => {
+      window.removeEventListener("mint-lane-coupons-updated", syncCoupons);
+      window.removeEventListener("storage", syncCoupons);
+    };
   }, []);
 
   useEffect(() => {
@@ -189,6 +209,77 @@ export function AdminPanel() {
       setClearMessage("Successfully cleared");
       window.setTimeout(() => setClearMessage(""), 2200);
     }, 520);
+  };
+
+  const updateCouponDraft = (field, value) => {
+    setCouponDraft((current) => ({ ...current, [field]: value }));
+  };
+
+  const resetCouponDraft = () => {
+    setCouponDraft({ code: "", type: "percent", value: "" });
+    setCouponMessage("");
+  };
+
+  const handleCouponSave = (event) => {
+    event.preventDefault();
+    const code = normalizeCouponCode(couponDraft.code);
+    const value = Number(couponDraft.value);
+
+    if (!code || value <= 0) {
+      setCouponMessage("Coupon code aur discount value required hai.");
+      return;
+    }
+
+    if (coupons.some((coupon) => normalizeCouponCode(coupon.code) === code)) {
+      setCouponMessage("Ye coupon code already list mein hai.");
+      return;
+    }
+
+    const nextCoupon = {
+      id: `coupon-${Date.now()}`,
+      code,
+      type: couponDraft.type,
+      value
+    };
+    const nextCoupons = saveCoupons([...coupons, nextCoupon]);
+    setCoupons(nextCoupons);
+    setCouponMessage(`${code} saved`);
+    setIsCouponFormOpen(false);
+    setCouponDraft({ code: "", type: "percent", value: "" });
+    window.setTimeout(() => setCouponMessage(""), 1800);
+  };
+
+  const handleRemoveAllCoupons = () => {
+    if (coupons.length === 0 || isRemovingCoupons) return;
+    setIsRemovingCoupons(true);
+    window.setTimeout(() => {
+      saveCoupons([]);
+      localStorage.removeItem(APPLIED_COUPON_STORAGE_KEY);
+      setCoupons([]);
+      setIsRemovingCoupons(false);
+      setCouponMessage("All coupons removed");
+      window.setTimeout(() => setCouponMessage(""), 1800);
+    }, 360);
+  };
+
+  const handleRemoveCoupon = (coupon) => {
+    if (removingCouponId || isRemovingCoupons) return;
+
+    setCouponMessage("");
+    setRemovingCouponId(coupon.id);
+    window.setTimeout(() => {
+      const nextCoupons = coupons.filter((currentCoupon) => currentCoupon.id !== coupon.id);
+      saveCoupons(nextCoupons);
+      setCoupons(nextCoupons);
+
+      if (normalizeCouponCode(localStorage.getItem(APPLIED_COUPON_STORAGE_KEY)) === normalizeCouponCode(coupon.code)) {
+        localStorage.removeItem(APPLIED_COUPON_STORAGE_KEY);
+      }
+
+      setRemovingCouponId("");
+      setCouponMessage(`${coupon.code} removed`);
+      window.setTimeout(() => setCouponMessage(""), 1800);
+    }, 320);
   };
 
   if (!isAuthed) {
@@ -430,6 +521,122 @@ export function AdminPanel() {
             <X size={18} />
             Rejected Orders ({rejectedOrders.length})
           </button>
+        </div>
+      </section>
+
+      <section className={`admin-coupon-card ${isCouponPanelOpen ? "is-open" : ""}`}>
+        <button
+          className="admin-coupon-toggle"
+          type="button"
+          onClick={() => setIsCouponPanelOpen((value) => !value)}
+          aria-expanded={isCouponPanelOpen}
+        >
+          <span>
+            <TicketPercent size={24} />
+            <small>Coupon manager</small>
+            <strong>{coupons.length} active coupon{coupons.length === 1 ? "" : "s"}</strong>
+          </span>
+          <i>{isCouponPanelOpen ? "Close" : "Open"}</i>
+        </button>
+
+        <div className="admin-coupon-body">
+          <div className="admin-coupon-actions">
+            <button
+              className="save-button compact"
+              type="button"
+              onClick={() => {
+                resetCouponDraft();
+                setIsCouponFormOpen(true);
+              }}
+            >
+              <Plus size={16} />
+              Add Coupon
+            </button>
+            <button
+              className="secondary-button compact coupon-remove-all"
+              type="button"
+              onClick={handleRemoveAllCoupons}
+              disabled={coupons.length === 0 || isRemovingCoupons}
+            >
+              <Trash2 size={16} />
+              {isRemovingCoupons ? "Removing" : "Remove All"}
+            </button>
+          </div>
+
+          <div className={`admin-coupon-form-wrap ${isCouponFormOpen ? "is-open" : ""}`}>
+            <form className="admin-coupon-form" onSubmit={handleCouponSave}>
+              <label>
+                Coupon code
+                <input
+                  value={couponDraft.code}
+                  onChange={(event) => updateCouponDraft("code", event.target.value)}
+                  placeholder="MINT25"
+                />
+              </label>
+              <label>
+                Discount type
+                <select value={couponDraft.type} onChange={(event) => updateCouponDraft("type", event.target.value)}>
+                  <option value="percent">Percent off</option>
+                  <option value="fixed">Flat rupees off</option>
+                </select>
+              </label>
+              <label>
+                Discount value
+                <input
+                  value={couponDraft.value}
+                  onChange={(event) => updateCouponDraft("value", event.target.value)}
+                  min="1"
+                  type="number"
+                  placeholder={couponDraft.type === "percent" ? "10" : "150"}
+                />
+              </label>
+              <div className="admin-coupon-form-actions">
+                <button
+                  className="secondary-button compact"
+                  type="button"
+                  onClick={() => {
+                    setIsCouponFormOpen(false);
+                    resetCouponDraft();
+                  }}
+                >
+                  <X size={16} />
+                  Cancel
+                </button>
+                <button className="save-button compact" type="submit">
+                  <Check size={16} />
+                  Save
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {couponMessage ? <p className="admin-coupon-message">{couponMessage}</p> : null}
+
+          <div className={`admin-coupon-list ${isRemovingCoupons ? "is-removing" : ""}`}>
+            {coupons.length === 0 ? (
+              <p className="empty-cart">No coupons yet. Add a code to make it available in cart checkout.</p>
+            ) : (
+              coupons.map((coupon, index) => (
+                <article
+                  className={`admin-coupon-item ${removingCouponId === coupon.id ? "is-removing" : ""}`}
+                  style={{ "--coupon-index": index }}
+                  key={coupon.id}
+                >
+                  <span>{coupon.code}</span>
+                  <strong>{coupon.type === "percent" ? `${coupon.value}% off` : `${formatPrice(coupon.value)} off`}</strong>
+                  <button
+                    className="admin-coupon-remove-button"
+                    type="button"
+                    onClick={() => handleRemoveCoupon(coupon)}
+                    disabled={Boolean(removingCouponId) || isRemovingCoupons}
+                    aria-label={`Remove ${coupon.code} coupon`}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </article>
+              ))
+            )}
+          </div>
         </div>
       </section>
 

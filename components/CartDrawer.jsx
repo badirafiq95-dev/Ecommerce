@@ -203,7 +203,7 @@ export function CartDrawer() {
           <div className="cart-billing-card" aria-label="Billing details">
             <div className="cart-billing-head">
               <span><TicketPercent size={16} /> Billing</span>
-              {appliedCoupon ? <strong>{appliedCoupon.label}</strong> : null}
+              {appliedCoupon ? <strong>{appliedCoupon.code}</strong> : null}
             </div>
             <div className="cart-billing-lines">
               <p><span>Subtotal</span><strong>{formatPrice(subtotal)}</strong></p>

@@ -1,22 +1,24 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import {
+  APPLIED_COUPON_STORAGE_KEY,
+  COUPONS_UPDATED_EVENT,
+  calculateCouponDiscount,
+  findCouponByCode,
+  readCoupons
+} from "../lib/coupons";
 
 const CartContext = createContext(null);
 const STORAGE_KEY = "mint-lane-cart";
-const COUPON_STORAGE_KEY = "mint-lane-coupon";
 const SHIPPING_CHARGE = 150;
-const COUPONS = {
-  MINT10: { label: "MINT10", type: "percent", value: 10 },
-  SAVE100: { label: "SAVE100", type: "fixed", value: 100 },
-  LANE150: { label: "LANE150", type: "fixed", value: 150 }
-};
 
 export function CartProvider({ children }) {
   const [items, setItems] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const [ready, setReady] = useState(false);
   const [limitNotice, setLimitNotice] = useState(null);
+  const [coupons, setCoupons] = useState([]);
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponNotice, setCouponNotice] = useState("");
 
@@ -24,11 +26,32 @@ export function CartProvider({ children }) {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) setItems(JSON.parse(saved));
-      const savedCoupon = localStorage.getItem(COUPON_STORAGE_KEY);
-      if (savedCoupon && COUPONS[savedCoupon]) setAppliedCoupon(COUPONS[savedCoupon]);
+      const nextCoupons = readCoupons();
+      setCoupons(nextCoupons);
+      const savedCoupon = localStorage.getItem(APPLIED_COUPON_STORAGE_KEY);
+      const matchingCoupon = findCouponByCode(savedCoupon, nextCoupons);
+      if (matchingCoupon) setAppliedCoupon(matchingCoupon);
     } finally {
       setReady(true);
     }
+  }, []);
+
+  useEffect(() => {
+    const syncCoupons = () => {
+      const nextCoupons = readCoupons();
+      setCoupons(nextCoupons);
+      setAppliedCoupon((current) => {
+        if (!current) return current;
+        return findCouponByCode(current.code, nextCoupons);
+      });
+    };
+
+    window.addEventListener(COUPONS_UPDATED_EVENT, syncCoupons);
+    window.addEventListener("storage", syncCoupons);
+    return () => {
+      window.removeEventListener(COUPONS_UPDATED_EVENT, syncCoupons);
+      window.removeEventListener("storage", syncCoupons);
+    };
   }, []);
 
   useEffect(() => {
@@ -38,10 +61,10 @@ export function CartProvider({ children }) {
   useEffect(() => {
     if (!ready) return;
     if (appliedCoupon) {
-      localStorage.setItem(COUPON_STORAGE_KEY, appliedCoupon.label);
+      localStorage.setItem(APPLIED_COUPON_STORAGE_KEY, appliedCoupon.code);
       return;
     }
-    localStorage.removeItem(COUPON_STORAGE_KEY);
+    localStorage.removeItem(APPLIED_COUPON_STORAGE_KEY);
   }, [appliedCoupon, ready]);
 
   const showLimitNotice = (product, maxStock) => {
@@ -101,7 +124,7 @@ export function CartProvider({ children }) {
 
   const applyCoupon = (code) => {
     const normalizedCode = String(code || "").trim().toUpperCase();
-    const coupon = COUPONS[normalizedCode];
+    const coupon = findCouponByCode(normalizedCode, coupons);
 
     if (!coupon) {
       setCouponNotice("Enter a valid coupon code.");
@@ -109,7 +132,7 @@ export function CartProvider({ children }) {
     }
 
     setAppliedCoupon(coupon);
-    setCouponNotice(`${coupon.label} applied successfully.`);
+    setCouponNotice(`${coupon.code} applied successfully.`);
     return true;
   };
 
@@ -128,14 +151,7 @@ export function CartProvider({ children }) {
     const count = items.reduce((sum, item) => sum + item.quantity, 0);
     const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const shippingCharge = items.length > 0 ? SHIPPING_CHARGE : 0;
-    const discountAmount = appliedCoupon
-      ? Math.min(
-          appliedCoupon.type === "percent"
-            ? Math.round((subtotal * appliedCoupon.value) / 100)
-            : appliedCoupon.value,
-          subtotal + shippingCharge
-        )
-      : 0;
+    const discountAmount = calculateCouponDiscount(appliedCoupon, subtotal, shippingCharge);
     const total = Math.max(0, subtotal + shippingCharge - discountAmount);
     return {
       items,
@@ -145,6 +161,7 @@ export function CartProvider({ children }) {
       discountAmount,
       total,
       appliedCoupon,
+      coupons,
       couponNotice,
       isOpen,
       setIsOpen,
@@ -157,7 +174,7 @@ export function CartProvider({ children }) {
       limitNotice,
       showLimitNotice
     };
-  }, [items, isOpen, limitNotice, appliedCoupon, couponNotice]);
+  }, [items, isOpen, limitNotice, appliedCoupon, couponNotice, coupons]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }
