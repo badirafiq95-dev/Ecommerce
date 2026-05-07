@@ -218,7 +218,7 @@ export function CheckoutForm() {
           subtotal,
           shippingCharge,
           discountAmount,
-          couponCode: appliedCoupon?.label || "",
+          couponCode: appliedCoupon?.code || "",
           total
         },
         status: "Payment review",
@@ -417,7 +417,7 @@ export function CheckoutForm() {
             <p><span>Price ({items.length} item{items.length === 1 ? "" : "s"})</span><strong>{formatPrice(subtotal)}</strong></p>
             <p><span>Shipping charge</span><strong>{formatPrice(shippingCharge)}</strong></p>
             {discountAmount > 0 ? (
-              <p className="flip-discount-row"><span>Coupon discount {appliedCoupon?.label ? `(${appliedCoupon.label})` : ""}</span><strong>-{formatPrice(discountAmount)}</strong></p>
+              <p className="flip-discount-row"><span>Coupon discount {appliedCoupon?.code ? `(${appliedCoupon.code})` : ""}</span><strong>-{formatPrice(discountAmount)}</strong></p>
             ) : null}
             <p><span>Total Payable</span><strong>{formatPrice(total)}</strong></p>
           </div>
