@@ -9,6 +9,7 @@ import { Header } from "../../../components/Header";
 import { useCustomerAuth } from "../../../components/CustomerAuthProvider";
 import { listenCustomerOrders } from "../../../lib/firebaseClient";
 import { formatPrice } from "../../../lib/format";
+import { readCustomerLocalOrders } from "../../../lib/orders";
 
 function getPaymentDisplay(status) {
   if (status === "Approved") {
@@ -54,7 +55,16 @@ export default function CustomerOrdersPage() {
 
   useEffect(() => {
     if (!user) return undefined;
-    return listenCustomerOrders(user.uid, setOrders);
+    const syncLocalOrders = () => setOrders(readCustomerLocalOrders(user.uid, user.email));
+    syncLocalOrders();
+    const stopOrders = listenCustomerOrders(user.uid, setOrders, user.email);
+    window.addEventListener("mint-lane-orders-updated", syncLocalOrders);
+    window.addEventListener("storage", syncLocalOrders);
+    return () => {
+      stopOrders();
+      window.removeEventListener("mint-lane-orders-updated", syncLocalOrders);
+      window.removeEventListener("storage", syncLocalOrders);
+    };
   }, [user]);
 
   const visibleOrders = useMemo(() => {

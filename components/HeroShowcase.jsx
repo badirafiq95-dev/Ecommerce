@@ -13,7 +13,7 @@ export function HeroShowcase() {
 
       <div className="graded-slab">
         <div className="slab-label">
-          <span>Mint Lane Cards</span>
+          <span>Freaking Collectibles</span>
           <strong>Foil Pull - Gem</strong>
           <small>Verified condition</small>
           <b>10</b>
@@ -21,7 +21,7 @@ export function HeroShowcase() {
         <div className="slab-card">
           <div className="card-title-row">
             <strong>Limited Foil</strong>
-            <span>MLC</span>
+            <span>FC</span>
           </div>
           <div className="card-art">
             <span className="card-glow" />
@@ -39,7 +39,7 @@ export function HeroShowcase() {
 
       <div className="collector-box">
         <span className="box-badge">M</span>
-        <strong>Mint Lane</strong>
+        <strong>Freaking Collectibles</strong>
         <small>Trading Cards</small>
         <span className="box-wave wave-one" />
         <span className="box-wave wave-two" />

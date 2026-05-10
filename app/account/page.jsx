@@ -3,22 +3,20 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { ArrowRight, CheckCircle2, Eye, EyeOff, LockKeyhole, LogOut, Mail, PackageCheck, ShieldCheck, UserRound, XCircle } from "lucide-react";
+import { CheckCircle2, LogOut, UserRound, XCircle } from "lucide-react";
 import { CartDrawer } from "../../components/CartDrawer";
 import { Header } from "../../components/Header";
 import { useCustomerAuth } from "../../components/CustomerAuthProvider";
 import {
-  createEmailAccount,
   listenCustomerOrders,
   listenCustomerProfile,
-  loginAnonymously,
-  loginWithEmail,
   loginWithGoogle,
   logoutCustomer,
   updateFirestoreOrder,
   upsertCustomerProfile
 } from "../../lib/firebaseClient";
 import { formatPrice } from "../../lib/format";
+import { readCustomerLocalOrders } from "../../lib/orders";
 
 const INDIA_STATES = [
   "Andaman & Nicobar Islands",
@@ -58,54 +56,88 @@ const INDIA_STATES = [
   "West Bengal"
 ];
 
+const PHONE_PREFIX = "+91";
+
+function getIndianMobileDigits(value) {
+  const rawValue = String(value || "");
+  const digits = rawValue.replace(/\D/g, "");
+  const hasCountryPrefix = rawValue.trim().startsWith(PHONE_PREFIX) || (digits.length > 10 && digits.startsWith("91"));
+  const localDigits = hasCountryPrefix ? digits.slice(2) : digits;
+  return localDigits.slice(0, 10);
+}
+
+function normalizeIndianMobile(value, keepPrefix = false) {
+  const rawValue = String(value || "");
+  if (keepPrefix && ["", "+", "+9", "+91", "9", "91"].includes(rawValue.trim())) return PHONE_PREFIX;
+  const localDigits = getIndianMobileDigits(rawValue);
+  if (!keepPrefix && !localDigits) return "";
+  return `${PHONE_PREFIX}${localDigits}`;
+}
+
+function getSavableIndianMobile(value) {
+  const localDigits = getIndianMobileDigits(value);
+  return localDigits ? `${PHONE_PREFIX}${localDigits}` : "";
+}
+
+function keepPhonePrefixOnDelete(event) {
+  if (event.key !== "Backspace" && event.key !== "Delete") return;
+  const input = event.currentTarget;
+  if (input.selectionStart <= PHONE_PREFIX.length && input.selectionEnd <= PHONE_PREFIX.length) {
+    event.preventDefault();
+  }
+}
+
+function keepPhoneCursorAfterPrefix(event) {
+  const input = event.currentTarget;
+  if (input.selectionStart < PHONE_PREFIX.length) {
+    window.requestAnimationFrame(() => input.setSelectionRange(PHONE_PREFIX.length, PHONE_PREFIX.length));
+  }
+}
+
+function splitProfileName(name) {
+  const parts = String(name || "").split(/[.\s_-]+/).filter(Boolean);
+  return {
+    firstName: parts[0] || "",
+    lastName: parts.slice(1).join(" ")
+  };
+}
+
+function getReadableDate(value) {
+  if (!value) return "Recently";
+  if (typeof value?.toDate === "function") return value.toDate().toLocaleString();
+  if (typeof value?.seconds === "number") return new Date(value.seconds * 1000).toLocaleString();
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Recently" : date.toLocaleString();
+}
+
 function authErrorMessage(error) {
   if (error?.code === "auth/unauthorized-domain") {
-    return "This website domain is not added in Firebase Authorized domains.";
+    const currentDomain =
+      typeof window !== "undefined" && window.location?.hostname
+        ? window.location.hostname
+        : "current website domain";
+    const firebaseProject =
+      process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "your Firebase project";
+    return `Firebase login blocked hai kyunki "${currentDomain}" "${firebaseProject}" project ke Authorized domains me add nahi hai. Firebase Console me same project open karke Authentication > Settings > Authorized domains me is domain ko add karo, phir refresh karke login try karo.`;
   }
   if (error?.code === "auth/popup-closed-by-user") {
     return "Google login was closed before it finished.";
   }
   if (error?.code === "auth/operation-not-allowed") {
-    return "This login method is not enabled in Firebase.";
-  }
-  if (error?.code === "auth/invalid-credential") {
-    return "Email ID or password is incorrect.";
+    return "Google login is not enabled in Firebase.";
   }
   return error?.message || "Login failed. Please try again.";
 }
 
 function AuthPanel() {
-  const [mode, setMode] = useState("login");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
 
-  const handleEmailAuth = async (event) => {
-    event.preventDefault();
-    setError("");
-    setLoading(true);
-    const form = new FormData(event.currentTarget);
-    try {
-      const email = String(form.get("email") || "").trim();
-      const password = String(form.get("password") || "");
-      const name = String(form.get("name") || "").trim();
-      if (mode === "create") {
-        await createEmailAccount(email, password, name);
-      } else {
-        await loginWithEmail(email, password);
-      }
-    } catch (error) {
-      setError(authErrorMessage(error));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleQuickAuth = async (action) => {
+  const handleGoogleAuth = async () => {
     setError("");
     setLoading(true);
     try {
-      await action();
+      await loginWithGoogle();
     } catch (error) {
       setError(authErrorMessage(error));
     } finally {
@@ -123,54 +155,18 @@ function AuthPanel() {
         <h1>Customer Login</h1>
         <p>Track orders, save payment details, edit your profile, and request cancellation from one secure dashboard.</p>
 
-        <div className="auth-choice-grid">
-          <button type="button" onClick={() => handleQuickAuth(loginWithGoogle)} disabled={loading}>
+        <div className="auth-choice-grid google-only-auth">
+          <button type="button" onClick={handleGoogleAuth} disabled={loading}>
             <svg className="google-mark" viewBox="0 0 24 24" aria-hidden="true">
               <path fill="#4285F4" d="M21.6 12.23c0-.78-.07-1.53-.2-2.23H12v4.22h5.38a4.6 4.6 0 0 1-2 3.02v2.52h3.24c1.9-1.75 2.98-4.33 2.98-7.53Z" />
               <path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.62-2.44l-3.24-2.52c-.9.6-2.04.96-3.38.96-2.6 0-4.8-1.76-5.59-4.12H3.06v2.6A10 10 0 0 0 12 22Z" />
               <path fill="#FBBC05" d="M6.41 13.88A6 6 0 0 1 6.1 12c0-.65.11-1.29.31-1.88v-2.6H3.06A10 10 0 0 0 2 12c0 1.61.39 3.14 1.06 4.48l3.35-2.6Z" />
               <path fill="#EA4335" d="M12 6c1.47 0 2.8.51 3.84 1.5l2.88-2.88C16.96 2.98 14.7 2 12 2a10 10 0 0 0-8.94 5.52l3.35 2.6C7.2 7.76 9.4 6 12 6Z" />
             </svg>
-            <span className="google-login-text">Continue with Google</span>
-          </button>
-          <button type="button" onClick={() => setMode((value) => (value === "create" ? "login" : "create"))} disabled={loading}>
-            <ShieldCheck size={18} />
-            {mode === "create" ? "Use existing ID" : "Create user ID"}
-          </button>
-          <button type="button" onClick={() => handleQuickAuth(loginAnonymously)} disabled={loading}>
-            <UserRound size={18} />
-            Continue anonymously
+            <span className="google-login-text">{loading ? "Connecting..." : "Continue with Google"}</span>
           </button>
         </div>
-
-        <div className="customer-email-divider">
-          <span>Or continue with email</span>
-        </div>
-
-        <form className="customer-auth-form" onSubmit={handleEmailAuth}>
-          {mode === "create" ? (
-            <label className="customer-input-field">
-              <UserRound size={18} />
-              <input name="name" placeholder="Customer name" />
-            </label>
-          ) : null}
-          <label className="customer-input-field">
-            <Mail size={18} />
-            <input name="email" type="email" placeholder="Email ID" required />
-          </label>
-          <label className="customer-input-field">
-            <LockKeyhole size={18} />
-            <input name="password" type={showPassword ? "text" : "password"} minLength={6} placeholder="Password" required />
-            <button type="button" onClick={() => setShowPassword((value) => !value)} aria-label="Toggle password visibility">
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
-          </label>
-          {error ? <p className="checkout-error">{error}</p> : null}
-          <button className="primary-button full" type="submit" disabled={loading}>
-            {loading ? "Please wait..." : mode === "create" ? "Create account" : "Login with email"}
-            <ArrowRight size={18} />
-          </button>
-        </form>
+        {error ? <p className="checkout-error">{error}</p> : null}
       </section>
     </main>
   );
@@ -185,12 +181,18 @@ function CustomerDashboard({ user }) {
 
   useEffect(() => {
     const stopProfile = listenCustomerProfile(user.uid, setProfile);
-    const stopOrders = listenCustomerOrders(user.uid, setOrders);
+    const syncLocalOrders = () => setOrders(readCustomerLocalOrders(user.uid, user.email));
+    syncLocalOrders();
+    const stopOrders = listenCustomerOrders(user.uid, setOrders, user.email);
+    window.addEventListener("mint-lane-orders-updated", syncLocalOrders);
+    window.addEventListener("storage", syncLocalOrders);
     return () => {
       stopProfile();
       stopOrders();
+      window.removeEventListener("mint-lane-orders-updated", syncLocalOrders);
+      window.removeEventListener("storage", syncLocalOrders);
     };
-  }, [user.uid]);
+  }, [user.uid, user.email]);
 
   const handleProfileSave = async (event) => {
     event.preventDefault();
@@ -331,17 +333,24 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
     alternatePhone: "",
     label: "Home"
   });
+  const [profileDraft, setProfileDraft] = useState({
+    firstName: "",
+    lastName: "",
+    gender: "",
+    phone: "",
+    address: ""
+  });
   const [isStateMenuOpen, setIsStateMenuOpen] = useState(false);
   const [isStateMenuPinned, setIsStateMenuPinned] = useState(false);
   const [isSavingAddress, setIsSavingAddress] = useState(false);
   const stateCloseTimerRef = useRef(null);
+  const profileNoticeTimerRef = useRef(null);
   const [notice, setNotice] = useState("");
+  const [noticeToken, setNoticeToken] = useState(0);
   const [addressNotice, setAddressNotice] = useState("");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const baseName = profile?.name || user.displayName || user.email?.split("@")[0] || "";
-  const nameParts = baseName.split(/[.\s_-]+/).filter(Boolean);
-  const firstName = nameParts[0] || "";
-  const lastName = nameParts.slice(1).join(" ");
+  const { firstName, lastName } = splitProfileName(baseName);
 
   useEffect(() => {
     return listenCustomerProfile(user.uid, setProfile);
@@ -352,11 +361,58 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
   }, [initialSection]);
 
   useEffect(() => {
-    return listenCustomerOrders(user.uid, setOrders);
-  }, [user.uid]);
+    const syncLocalOrders = () => setOrders(readCustomerLocalOrders(user.uid, user.email));
+    syncLocalOrders();
+    const stopOrders = listenCustomerOrders(user.uid, setOrders, user.email);
+    window.addEventListener("mint-lane-orders-updated", syncLocalOrders);
+    window.addEventListener("storage", syncLocalOrders);
+    return () => {
+      stopOrders();
+      window.removeEventListener("mint-lane-orders-updated", syncLocalOrders);
+      window.removeEventListener("storage", syncLocalOrders);
+    };
+  }, [user.uid, user.email]);
+
+  useEffect(() => {
+    return () => {
+      if (profileNoticeTimerRef.current) window.clearTimeout(profileNoticeTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (profile) return;
+    const fallbackName = splitProfileName(user.displayName || user.email?.split("@")[0] || "");
+    setProfileDraft((current) => {
+      const hasDraftValue =
+        current.firstName ||
+        current.lastName ||
+        current.gender ||
+        current.address ||
+        current.phone;
+
+      return hasDraftValue
+        ? current
+        : {
+            firstName: fallbackName.firstName,
+            lastName: fallbackName.lastName,
+            gender: "",
+            phone: "",
+            address: ""
+          };
+    });
+  }, [profile, user.displayName, user.email]);
 
   useEffect(() => {
     if (!profile) return;
+    const nextName = splitProfileName(profile.name || user.displayName || user.email?.split("@")[0] || "");
+    setProfileDraft({
+      firstName: nextName.firstName,
+      lastName: nextName.lastName,
+      gender: profile.gender || "",
+      phone: normalizeIndianMobile(profile.phone || ""),
+      address: profile.address || ""
+    });
+
     const savedAddresses = Array.isArray(profile.addresses) ? profile.addresses : [];
     if (savedAddresses.length) {
       setAddressDrafts(savedAddresses);
@@ -366,20 +422,43 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
     setAddressDrafts(profile.address ? [{ label: "Home", line: profile.address, name: baseName, phone: profile.phone || "" }] : []);
   }, [profile]);
 
+  const updateProfileDraft = (field, value) => {
+    setProfileDraft((current) => ({ ...current, [field]: value }));
+  };
+
   const handleProfileSave = async (event) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const nextFirstName = String(form.get("firstName") || "").trim();
-    const nextLastName = String(form.get("lastName") || "").trim();
-    await upsertCustomerProfile(user, {
+    const nextFirstName = profileDraft.firstName.trim();
+    const nextLastName = profileDraft.lastName.trim();
+    const normalizedPhone = getSavableIndianMobile(profileDraft.phone);
+    const nextProfile = {
+      ...(profile || {}),
+      uid: user.uid,
       name: [nextFirstName, nextLastName].filter(Boolean).join(" "),
-      gender: String(form.get("gender") || "").trim(),
-      phone: String(form.get("phone") || "").trim(),
-      address: String(form.get("address") || "").trim(),
-      addresses: addressDrafts
+      email: user.email || profile?.email || "",
+      isAnonymous: user.isAnonymous,
+      gender: profileDraft.gender,
+      phone: normalizedPhone,
+      address: profileDraft.address.trim(),
+      addresses: addressDrafts,
+      updatedAt: new Date().toISOString()
+    };
+
+    setProfileDraft((current) => ({ ...current, phone: normalizedPhone }));
+    setProfile(nextProfile);
+    if (profileNoticeTimerRef.current) window.clearTimeout(profileNoticeTimerRef.current);
+    setNotice("Changes saved");
+    setNoticeToken(Date.now());
+    profileNoticeTimerRef.current = window.setTimeout(() => {
+      setNotice("");
+      profileNoticeTimerRef.current = null;
+    }, 2200);
+
+    upsertCustomerProfile(user, nextProfile).catch((error) => {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("[Firebase] Profile save queued locally:", error?.message || error);
+      }
     });
-    setNotice("Saved");
-    window.setTimeout(() => setNotice(""), 1800);
   };
 
   const handleLogout = async () => {
@@ -684,21 +763,11 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
       );
     }
 
-    if (activeSection === "payments") {
-      return (
-        <section className="customer-profile-panel profile-content-panel">
-          <div className="profile-panel-head">
-            <div>
-              <p className="eyebrow">Payments</p>
-              <h1>Payments</h1>
-            </div>
-          </div>
-          <p className="empty-cart">Payment settings will be added here soon.</p>
-        </section>
-      );
-    }
-
     if (activeSection === "notifications") {
+      const orderNotifications = orders
+        .filter((order) => order.status === "Approved" || order.status === "Rejected")
+        .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
+
       return (
         <section className="customer-profile-panel profile-content-panel">
           <div className="profile-panel-head">
@@ -707,18 +776,41 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
               <h1>Notifications</h1>
             </div>
           </div>
-          <div className="profile-notification-empty">
-            <div className="notification-illustration" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-              <div>
-                <strong />
-              </div>
+          {orderNotifications.length ? (
+            <div className="profile-notification-list">
+              {orderNotifications.map((order) => {
+                const isApproved = order.status === "Approved";
+                const firstItem = order.items?.[0]?.name || "your order";
+                return (
+                  <article className={`profile-notification-card ${isApproved ? "is-approved" : "is-rejected"}`} key={`notification-${order.id}`}>
+                    <div className="profile-notification-icon">
+                      {isApproved ? <CheckCircle2 size={20} /> : <XCircle size={20} />}
+                    </div>
+                    <div>
+                      <strong>{isApproved ? "Order accepted" : "Order rejected"}</strong>
+                      <p>
+                        Seller has {isApproved ? "accepted" : "rejected"} {firstItem}. Order ID {order.id}.
+                      </p>
+                      <span>{getReadableDate(order.updatedAt || order.createdAt)}</span>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
-            <h2>All caught up!</h2>
-            <p>There are no new notifications for you.</p>
-          </div>
+          ) : (
+            <div className="profile-notification-empty">
+              <div className="notification-illustration" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+                <div>
+                  <strong />
+                </div>
+              </div>
+              <h2>All caught up!</h2>
+              <p>There are no new notifications for you.</p>
+            </div>
+          )}
         </section>
       );
     }
@@ -731,17 +823,32 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
               <p className="eyebrow">My Profile</p>
               <h1>Personal Information</h1>
             </div>
-            {notice ? <span className="save-status">{notice}</span> : null}
+            {notice ? (
+              <span className="save-status profile-save-status" key={`profile-notice-${noticeToken}`} role="status">
+                <CheckCircle2 size={16} />
+                {notice}
+              </span>
+            ) : null}
           </div>
 
           <div className="profile-field-grid">
             <label>
               First name
-              <input name="firstName" defaultValue={firstName} placeholder="First name" />
+              <input
+                name="firstName"
+                value={profileDraft.firstName}
+                onChange={(event) => updateProfileDraft("firstName", event.target.value)}
+                placeholder="First name"
+              />
             </label>
             <label>
               Last name
-              <input name="lastName" defaultValue={lastName} placeholder="Last name" />
+              <input
+                name="lastName"
+                value={profileDraft.lastName}
+                onChange={(event) => updateProfileDraft("lastName", event.target.value)}
+                placeholder="Last name"
+              />
             </label>
           </div>
 
@@ -749,15 +856,33 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
             <h2>Your Gender</h2>
             <div className="profile-gender-options">
               <label>
-                <input name="gender" type="radio" value="Male" defaultChecked={profile?.gender === "Male"} />
+                <input
+                  name="gender"
+                  type="radio"
+                  value="Male"
+                  checked={profileDraft.gender === "Male"}
+                  onChange={(event) => updateProfileDraft("gender", event.target.value)}
+                />
                 Male
               </label>
               <label>
-                <input name="gender" type="radio" value="Female" defaultChecked={profile?.gender === "Female"} />
+                <input
+                  name="gender"
+                  type="radio"
+                  value="Female"
+                  checked={profileDraft.gender === "Female"}
+                  onChange={(event) => updateProfileDraft("gender", event.target.value)}
+                />
                 Female
               </label>
               <label>
-                <input name="gender" type="radio" value="Other" defaultChecked={profile?.gender === "Other"} />
+                <input
+                  name="gender"
+                  type="radio"
+                  value="Other"
+                  checked={profileDraft.gender === "Other"}
+                  onChange={(event) => updateProfileDraft("gender", event.target.value)}
+                />
                 Other
               </label>
             </div>
@@ -770,12 +895,33 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
 
           <section className="profile-section-block">
             <h2>Mobile Number</h2>
-            <input name="phone" defaultValue={profile?.phone || ""} placeholder="+91 98765 43210" />
+            <input
+              name="phone"
+              value={profileDraft.phone}
+              onFocus={() => {
+                if (!profileDraft.phone) updateProfileDraft("phone", PHONE_PREFIX);
+              }}
+              onClick={keepPhoneCursorAfterPrefix}
+              onKeyDown={keepPhonePrefixOnDelete}
+              onChange={(event) => updateProfileDraft("phone", normalizeIndianMobile(event.target.value, true))}
+              onBlur={() => updateProfileDraft("phone", profileDraft.phone === PHONE_PREFIX ? "" : normalizeIndianMobile(profileDraft.phone))}
+              inputMode="numeric"
+              maxLength={13}
+              autoComplete="tel"
+              placeholder="Enter Mobile Number"
+              title="Enter +91 followed by 10 digits."
+            />
           </section>
 
           <section className="profile-section-block">
             <h2>Saved Address</h2>
-            <textarea name="address" defaultValue={profile?.address || ""} rows={4} placeholder="House, street, city, PIN" />
+            <textarea
+              name="address"
+              value={profileDraft.address}
+              onChange={(event) => updateProfileDraft("address", event.target.value)}
+              rows={4}
+              placeholder="House, street, city, PIN"
+            />
           </section>
 
           <button className="primary-button profile-save-button" type="submit">Save profile</button>
@@ -799,7 +945,6 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
           <button className={activeSection === "profile" ? "is-active" : ""} type="button" onClick={() => switchProfileSection("profile")}>Profile Information</button>
           <button type="button" onClick={() => router.push("/account/orders")}>My Orders</button>
           <button className={activeSection === "addresses" ? "is-active" : ""} type="button" onClick={() => switchProfileSection("addresses")}>Manage Addresses</button>
-          <button className={activeSection === "payments" ? "is-active" : ""} type="button" onClick={() => switchProfileSection("payments")}>Payments</button>
           <button className={activeSection === "notifications" ? "is-active" : ""} type="button" onClick={() => switchProfileSection("notifications")}>Notifications</button>
         </nav>
         <button className="profile-sidebar-logout" type="button" onClick={handleLogout} disabled={isLoggingOut}>
@@ -831,7 +976,7 @@ export default function AccountPage() {
     }
 
     if (!loading && user && view === "profile") {
-      const allowedSections = ["profile", "addresses", "payments", "notifications"];
+      const allowedSections = ["profile", "addresses", "notifications"];
       setAccountView("profile");
       setProfileSection(allowedSections.includes(section) ? section : "profile");
       return;
@@ -845,7 +990,7 @@ export default function AccountPage() {
   useEffect(() => {
     const handleSectionChange = (event) => {
       const section = event.detail?.section;
-      const allowedSections = ["profile", "addresses", "payments", "notifications"];
+      const allowedSections = ["profile", "addresses", "notifications"];
       if (allowedSections.includes(section)) {
         setAccountView("profile");
         setProfileSection(section);

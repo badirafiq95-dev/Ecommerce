@@ -9,7 +9,9 @@ import {
   ChevronDown,
   CircleUserRound,
   Grid2X2,
+  HelpCircle,
   LogOut,
+  Menu,
   Search,
   ShieldCheck,
   ShoppingCart,
@@ -32,11 +34,14 @@ export function Header() {
   const [adminShortcutExiting, setAdminShortcutExiting] = useState(false);
   const [secretOpening, setSecretOpening] = useState(false);
   const [isCustomerLoggingOut, setIsCustomerLoggingOut] = useState(false);
+  const [isHelpOpening, setIsHelpOpening] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [profileMenuStyle, setProfileMenuStyle] = useState({});
   const secretClickRef = useRef({ count: 0, timer: null });
   const profileMenuRef = useRef(null);
   const profileTriggerRef = useRef(null);
+  const mobileHeaderMenuRef = useRef(null);
   const profilePointerHandledRef = useRef(false);
 
   useEffect(() => {
@@ -55,7 +60,28 @@ export function Header() {
 
   useEffect(() => {
     setIsProfileMenuOpen(false);
+    setIsMobileMenuOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    if (!isMobileMenuOpen) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (mobileHeaderMenuRef.current?.contains(event.target)) return;
+      setIsMobileMenuOpen(false);
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") setIsMobileMenuOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isMobileMenuOpen]);
 
   useEffect(() => {
     if (!isProfileMenuOpen) return undefined;
@@ -166,12 +192,30 @@ export function Header() {
   const profileFirstName = profileName.split(/[.\s_-]+/).filter(Boolean)[0] || "Login";
   const handleLogout = async () => {
     if (isCustomerLoggingOut) return;
+    setIsMobileMenuOpen(false);
+    setIsProfileMenuOpen(false);
     setIsCustomerLoggingOut(true);
     window.setTimeout(async () => {
       await logoutCustomer();
       router.replace("/");
       window.setTimeout(() => setIsCustomerLoggingOut(false), 250);
     }, 1350);
+  };
+
+  const handleHelpOpen = () => {
+    if (isHelpOpening) return;
+    setIsMobileMenuOpen(false);
+    setIsProfileMenuOpen(false);
+    setIsHelpOpening(true);
+    window.setTimeout(() => {
+      setIsHelpOpening(false);
+      if (pathname === "/") {
+        document.getElementById("contact")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        window.history.replaceState(null, "", "/#contact");
+        return;
+      }
+      router.push("/#contact");
+    }, 760);
   };
 
   const handleProfileOpen = () => {
@@ -262,21 +306,39 @@ export function Header() {
         )
       : null;
 
+  const helpOpeningOverlay =
+    isHelpOpening && typeof document !== "undefined"
+      ? createPortal(
+          <div className="logout-overlay customer-logout-overlay help-redirect-overlay" aria-live="polite">
+            <div className="logout-card customer-logout-card">
+              <div className="logout-icon">
+                <HelpCircle size={42} />
+              </div>
+              <p className="eyebrow">Help desk</p>
+              <h2>Opening Help</h2>
+              <span>Taking you to contact details...</span>
+            </div>
+          </div>,
+          document.body
+        )
+      : null;
+
   return (
     <header className={`site-header demo-site-header ${pathname === "/admin" ? "is-admin-route" : ""}`}>
       {customerLogoutOverlay}
-      <div className="brand demo-brand" aria-label="Mint Lane">
+      {helpOpeningOverlay}
+      <div className="brand demo-brand" aria-label="Freaking Collectibles">
         <button
           className={`brand-mark secret-brand-mark ${adminShortcutActive ? "is-admin-unlocked" : ""} ${
             adminShortcutExiting ? "is-admin-locking" : ""
           } ${secretOpening ? "is-secret-opening" : ""}`}
           type="button"
           onClick={handleSecretAdminTap}
-          aria-label={adminShortcutActive ? "Open admin panel" : "Mint Lane logo"}
+          aria-label={adminShortcutActive ? "Open admin panel" : "Freaking Collectibles logo"}
         >
           M
         </button>
-        <Link href="/" aria-label="Mint Lane home" onClick={handleBrandHomeClick}>Mint Lane</Link>
+        <Link href="/" aria-label="Freaking Collectibles home" onClick={handleBrandHomeClick}>Freaking Collectibles</Link>
       </div>
       <div className="header-shop-tools" aria-label="Store tools">
         <Link className="header-category-button" href="/#products">
@@ -371,6 +433,27 @@ export function Header() {
           </span>
           <span className="cart-label">Cart</span>
         </button>
+        <div className={`mobile-header-menu ${isMobileMenuOpen ? "is-open" : ""}`} ref={mobileHeaderMenuRef}>
+          <button
+            className="mobile-menu-trigger"
+            type="button"
+            onClick={() => setIsMobileMenuOpen((current) => !current)}
+            aria-label="Open menu"
+            aria-expanded={isMobileMenuOpen}
+          >
+            <Menu size={34} strokeWidth={2.2} />
+          </button>
+          <div className="mobile-actions-dropdown" aria-label="Mobile menu">
+            <button type="button" onClick={handleHelpOpen}>
+              <HelpCircle size={19} strokeWidth={1.9} />
+              Help
+            </button>
+            <button type="button" onClick={user ? handleLogout : () => router.push("/account?next=/")}>
+              <LogOut size={19} strokeWidth={1.9} />
+              Logout
+            </button>
+          </div>
+        </div>
       </nav>
     </header>
   );

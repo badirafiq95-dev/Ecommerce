@@ -49,10 +49,10 @@ export default function HomePage() {
           <ProductGrid products={products} />
         </section>
       </main>
-      <footer className="footer">
-        <strong>Mint Lane Cards</strong>
-        <span>WhatsApp: +91 98765 43210</span>
-        <span>Email: orders@mintlanecards.example</span>
+      <footer className="footer" id="contact">
+        <strong>Freaking Collectibles</strong>
+        <a href="https://wa.me/919968596934" target="_blank" rel="noopener noreferrer">WhatsApp: +919968596934</a>
+        <a href="mailto:freakingcollectibles@gmail.com">Email: freakingcollectibles@gmail.com</a>
       </footer>
     </>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   APPLIED_COUPON_STORAGE_KEY,
   COUPONS_UPDATED_EVENT,
@@ -21,6 +21,7 @@ export function CartProvider({ children }) {
   const [coupons, setCoupons] = useState([]);
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponNotice, setCouponNotice] = useState("");
+  const couponNoticeTimerRef = useRef(null);
 
   useEffect(() => {
     try {
@@ -66,6 +67,28 @@ export function CartProvider({ children }) {
     }
     localStorage.removeItem(APPLIED_COUPON_STORAGE_KEY);
   }, [appliedCoupon, ready]);
+
+  useEffect(() => {
+    return () => {
+      if (couponNoticeTimerRef.current) window.clearTimeout(couponNoticeTimerRef.current);
+    };
+  }, []);
+
+  const showCouponNotice = (message, duration = 0) => {
+    if (couponNoticeTimerRef.current) {
+      window.clearTimeout(couponNoticeTimerRef.current);
+      couponNoticeTimerRef.current = null;
+    }
+
+    setCouponNotice(message);
+
+    if (duration > 0) {
+      couponNoticeTimerRef.current = window.setTimeout(() => {
+        setCouponNotice((current) => (current === message ? "" : current));
+        couponNoticeTimerRef.current = null;
+      }, duration);
+    }
+  };
 
   const showLimitNotice = (product, maxStock) => {
     const token = Date.now();
@@ -127,24 +150,24 @@ export function CartProvider({ children }) {
     const coupon = findCouponByCode(normalizedCode, coupons);
 
     if (!coupon) {
-      setCouponNotice("Enter a valid coupon code.");
+      showCouponNotice("Invalid coupon.", 1500);
       return false;
     }
 
     setAppliedCoupon(coupon);
-    setCouponNotice(`${coupon.code} applied successfully.`);
+    showCouponNotice(`${coupon.code} applied successfully.`);
     return true;
   };
 
   const removeCoupon = () => {
     setAppliedCoupon(null);
-    setCouponNotice("Coupon removed.");
+    showCouponNotice("Coupon removed.", 1800);
   };
 
   const clearCart = () => {
     setItems([]);
     setAppliedCoupon(null);
-    setCouponNotice("");
+    showCouponNotice("");
   };
 
   const value = useMemo(() => {
