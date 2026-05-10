@@ -14373,3 +14373,140 @@ h2 {
     font-weight: 850;
   }
 }
+
+/* Mobile hero scroll comfort. Desktop/tablet composition stays untouched. */
+@media (max-width: 768px) {
+  .demo-home {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    overflow-x: clip !important;
+    overflow-y: visible !important;
+    overscroll-behavior: auto !important;
+    -webkit-overflow-scrolling: auto !important;
+  }
+
+  .demo-home .hero {
+    display: block !important;
+    position: relative !important;
+    min-height: auto !important;
+    height: auto !important;
+    max-height: none !important;
+    gap: clamp(10px, 3.2vw, 16px) !important;
+    padding: clamp(22px, 5.6vw, 32px) 18px 0 !important;
+    align-items: start !important;
+    overflow: hidden !important;
+    overflow: clip !important;
+    overflow-x: clip !important;
+    overflow-y: clip !important;
+    overscroll-behavior: auto !important;
+    -webkit-overflow-scrolling: auto !important;
+    touch-action: pan-y !important;
+  }
+
+  .demo-home .hero-copy {
+    transform: none !important;
+    overflow: visible !important;
+    overscroll-behavior: auto !important;
+    -webkit-overflow-scrolling: auto !important;
+    touch-action: pan-y !important;
+  }
+
+  .demo-home .hero-badge {
+    margin-bottom: clamp(16px, 4.8vw, 24px) !important;
+  }
+
+  .demo-home .hero-tagline {
+    margin-bottom: clamp(12px, 3vw, 18px) !important;
+  }
+
+  .demo-home .hero-visual {
+    display: block !important;
+    position: relative !important;
+    width: calc(100% + 36px) !important;
+    height: clamp(240px, 60vw, 310px) !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: -2px -18px 0 !important;
+    overflow: hidden !important;
+    overflow: clip !important;
+    overflow-x: clip !important;
+    overflow-y: clip !important;
+    overscroll-behavior: auto !important;
+    -webkit-overflow-scrolling: auto !important;
+    touch-action: pan-y !important;
+    pointer-events: none !important;
+  }
+
+  .demo-home .hero-showcase {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    overflow-y: visible !important;
+    overscroll-behavior: auto !important;
+    -webkit-overflow-scrolling: auto !important;
+    transform: scale(0.7) translateY(-8px) !important;
+    transform-origin: top center !important;
+  }
+
+  .demo-home .hero-line,
+  .demo-home .hero-orbit,
+  .demo-home .hero-stand,
+  .demo-home .showcase-curve {
+    pointer-events: none !important;
+  }
+
+  .demo-home .trust-strip {
+    margin-top: 0 !important;
+  }
+}
+
+@media (max-width: 430px) {
+  .demo-home .hero {
+    padding-top: clamp(18px, 5.5vw, 26px) !important;
+  }
+
+  .demo-home h1 {
+    font-size: clamp(3rem, 13vw, 3.42rem) !important;
+  }
+
+  .demo-home .hero-visual {
+    height: clamp(208px, 55vw, 248px) !important;
+  }
+
+  .demo-home .hero-showcase {
+    transform: scale(0.62) translateY(-8px) !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .demo-home .hero-visual {
+    height: 204px !important;
+  }
+
+  .demo-home .hero-showcase {
+    transform: scale(0.58) translateY(-10px) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .demo-home .hero::-webkit-scrollbar,
+  .demo-home .hero-copy::-webkit-scrollbar,
+  .demo-home .hero-visual::-webkit-scrollbar,
+  .demo-home .hero-showcase::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  .demo-home .hero,
+  .demo-home .hero-copy,
+  .demo-home .hero-visual,
+  .demo-home .hero-showcase {
+    scrollbar-width: none !important;
+  }
+}
