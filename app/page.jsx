@@ -21,11 +21,6 @@ export default function HomePage() {
             <p className="hero-tagline">
               Curated trading cards. Verified condition. Packed with care. Delivered to you.
             </p>
-            <div className="hero-actions">
-              <a className="primary-button" href="#products">
-                Browse Categories <ArrowRight size={18} />
-              </a>
-            </div>
           </div>
           <div className="hero-stand" aria-hidden="true" />
           <div className="hero-visual reveal">

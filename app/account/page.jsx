@@ -769,7 +769,7 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
         .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
 
       return (
-        <section className="customer-profile-panel profile-content-panel">
+        <section className="customer-profile-panel profile-content-panel profile-notifications-panel">
           <div className="profile-panel-head">
             <div>
               <p className="eyebrow">Notifications</p>
