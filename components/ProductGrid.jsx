@@ -21,7 +21,7 @@ export function ProductGrid({ products: initialProducts }) {
               alt={product.name}
               width={460}
               height={360}
-              sizes="(max-width: 700px) 50vw, (max-width: 1100px) 33vw, 25vw"
+              sizes="(max-width: 700px) 33vw, (max-width: 1100px) 33vw, 25vw"
               loading="lazy"
               unoptimized={product.image.startsWith("data:")}
             />

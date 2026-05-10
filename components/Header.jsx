@@ -323,8 +323,15 @@ export function Header() {
         )
       : null;
 
+  const isHomeRoute = pathname === "/";
+  const isCustomerAccountRoute = pathname === "/account" && Boolean(user);
+
   return (
-    <header className={`site-header demo-site-header ${pathname === "/admin" ? "is-admin-route" : ""}`}>
+    <header
+      className={`site-header demo-site-header ${isHomeRoute ? "is-home-route" : ""} ${
+        pathname === "/admin" ? "is-admin-route" : ""
+      } ${isCustomerAccountRoute ? "is-customer-account-route" : ""}`}
+    >
       {customerLogoutOverlay}
       {helpOpeningOverlay}
       <div className="brand demo-brand" aria-label="Freaking Collectibles">

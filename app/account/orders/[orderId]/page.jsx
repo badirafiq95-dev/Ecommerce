@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
-import { Home, MessageCircle, UserRound } from "lucide-react";
+import { ArrowLeft, Home, MessageCircle, UserRound } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { CartDrawer } from "../../../../components/CartDrawer";
 import { Header } from "../../../../components/Header";
@@ -95,9 +95,18 @@ export default function CustomerOrderDetailPage() {
 
   return (
     <>
-      <Header />
-      <CartDrawer />
+      <div className="orders-desktop-chrome">
+        <Header />
+        <CartDrawer />
+      </div>
       <main className="order-detail-shell">
+        <header className="mobile-orders-topbar mobile-order-detail-topbar">
+          <button type="button" onClick={() => router.back()} aria-label="Back">
+            <ArrowLeft size={24} />
+          </button>
+          <h1>Order Details</h1>
+        </header>
+
         <nav className="orders-breadcrumb order-detail-breadcrumb" aria-label="Breadcrumb">
           <button type="button" onClick={() => router.push("/")}>Home</button>
           <button type="button" onClick={() => router.push("/account?view=profile")}>My Account</button>
