@@ -3,7 +3,7 @@ import { CartDrawer } from "../../components/CartDrawer";
 import { Header } from "../../components/Header";
 
 export const metadata = {
-  title: "Admin Login | Mint Lane Cards"
+  title: "Admin Login | Freaking Collectibles"
 };
 
 export default function AdminPage() {

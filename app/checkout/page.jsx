@@ -3,7 +3,7 @@ import { CheckoutForm } from "../../components/CheckoutForm";
 import { Header } from "../../components/Header";
 
 export const metadata = {
-  title: "Checkout | Mint Lane Cards"
+  title: "Checkout | Freaking Collectibles"
 };
 
 export default function CheckoutPage() {

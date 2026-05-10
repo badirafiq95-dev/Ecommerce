@@ -13,7 +13,13 @@ export function CustomerAuthProvider({ children }) {
     return listenToAuth(async (nextUser) => {
       setUser(nextUser);
       setLoading(false);
-      if (nextUser) await upsertCustomerProfile(nextUser);
+      if (nextUser) {
+        upsertCustomerProfile(nextUser).catch((error) => {
+          if (process.env.NODE_ENV !== "production") {
+            console.warn("[Firebase] Profile sync skipped:", error?.message || error);
+          }
+        });
+      }
     });
   }, []);
 

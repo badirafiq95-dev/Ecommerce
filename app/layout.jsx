@@ -4,7 +4,7 @@ import { CustomerAuthProvider } from "../components/CustomerAuthProvider";
 import { PremiumMotion } from "../components/PremiumMotion";
 
 export const metadata = {
-  title: "Mint Lane Cards",
+  title: "Freaking Collectibles",
   description: "Fast, premium trading card singles, sealed products, graded cards, and supplies."
 };
 

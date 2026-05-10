@@ -25,7 +25,7 @@ import {
 import { formatPrice } from "../lib/format";
 import { APPLIED_COUPON_STORAGE_KEY, normalizeCouponCode, readCoupons, saveCoupons } from "../lib/coupons";
 import { getAdminSession, setAdminSession, startAdminAccessExit } from "../lib/adminSession";
-import { clearActiveOrders, clearRejectedOrders, readOrders, updateOrderStatus } from "../lib/orders";
+import { clearActiveOrders, clearRejectedOrders, mergeOrderLists, readOrders, updateOrderStatus } from "../lib/orders";
 import { sendOrderEmail } from "../lib/orderEmail";
 import { listenAllOrders, updateFirestoreOrder } from "../lib/firebaseClient";
 import { useProductCatalog } from "./useProductCatalog";
@@ -60,6 +60,7 @@ export function AdminPanel() {
   const [saveStatus, setSaveStatus] = useState("");
   const [newCategory, setNewCategory] = useState("");
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+  const [openProductCategoryId, setOpenProductCategoryId] = useState("");
   const [orders, setOrders] = useState([]);
   const [ordersView, setOrdersView] = useState("");
   const [isClearingOrders, setIsClearingOrders] = useState(false);
@@ -100,9 +101,9 @@ export function AdminPanel() {
   }, []);
 
   useEffect(() => {
-    const syncOrders = () => setOrders(readOrders());
+    const syncOrders = () => setOrders((currentOrders) => mergeOrderLists(readOrders(), currentOrders));
     const stopFirestoreOrders = listenAllOrders((cloudOrders) => {
-      if (cloudOrders.length) setOrders(cloudOrders);
+      setOrders((currentOrders) => mergeOrderLists(readOrders(), currentOrders, cloudOrders));
     });
     window.addEventListener("mint-lane-orders-updated", syncOrders);
     window.addEventListener("storage", syncOrders);
@@ -170,18 +171,32 @@ export function AdminPanel() {
     setNewCategory("");
   };
 
+  const handleProductPhotoChange = async (productId, file) => {
+    if (!file || file.size === 0) return;
+    const image = await readImageFile(file);
+    updateProduct(productId, { image });
+  };
+
   const handleSaveChanges = () => {
     saveChanges();
     setSaveStatus("Changes saved");
     window.setTimeout(() => setSaveStatus(""), 1800);
   };
 
-  const approveOrder = (orderId) => {
-    const nextOrders = updateOrderStatus(orderId, "Approved");
-    setOrders(nextOrders);
-    const approvedOrder = nextOrders.find((order) => order.id === orderId);
+  const approveOrder = (order) => {
+    const approvedOrder = {
+      ...order,
+      status: "Approved",
+      updatedAt: new Date().toISOString()
+    };
+    const nextOrders = updateOrderStatus(order.id, "Approved", approvedOrder);
+    setOrders((currentOrders) => mergeOrderLists(nextOrders, currentOrders, [approvedOrder]));
     if (approvedOrder) {
-      updateFirestoreOrder(orderId, { status: "Approved" });
+      updateFirestoreOrder(order.id, approvedOrder).catch((error) => {
+        if (process.env.NODE_ENV !== "production") {
+          console.warn("[Firebase] Order approval sync failed:", error?.message || error);
+        }
+      });
       sendOrderEmail("approved", approvedOrder);
     }
   };
@@ -190,11 +205,19 @@ export function AdminPanel() {
     if (order.status !== "Rejected" && order.status !== "Cancelled") {
       restoreStock(order.items);
     }
-    const nextOrders = updateOrderStatus(order.id, "Rejected");
-    setOrders(nextOrders);
-    const rejectedOrder = nextOrders.find((currentOrder) => currentOrder.id === order.id);
+    const rejectedOrder = {
+      ...order,
+      status: "Rejected",
+      updatedAt: new Date().toISOString()
+    };
+    const nextOrders = updateOrderStatus(order.id, "Rejected", rejectedOrder);
+    setOrders((currentOrders) => mergeOrderLists(nextOrders, currentOrders, [rejectedOrder]));
     if (rejectedOrder) {
-      updateFirestoreOrder(order.id, { status: "Rejected" });
+      updateFirestoreOrder(order.id, rejectedOrder).catch((error) => {
+        if (process.env.NODE_ENV !== "production") {
+          console.warn("[Firebase] Order rejection sync failed:", error?.message || error);
+        }
+      });
       sendOrderEmail("rejected", rejectedOrder);
     }
   };
@@ -429,6 +452,10 @@ export function AdminPanel() {
                           <small>Phone</small>
                           <strong>{order.phone}</strong>
                         </span>
+                        <span>
+                          <small>UTR Number</small>
+                          <strong>{order.paymentUtr || "Not provided"}</strong>
+                        </span>
                       </div>
                       <div className="order-address">
                         <small>Address</small>
@@ -442,6 +469,14 @@ export function AdminPanel() {
                             <strong>{order.paymentScreenshot.name || "View uploaded screenshot"}</strong>
                           </span>
                         </a>
+                      ) : order.paymentScreenshot?.name ? (
+                        <div className="order-attachment is-empty">
+                          <span>
+                            <small>Payment Screenshot Attachment</small>
+                            <strong>{order.paymentScreenshot.name}</strong>
+                            <p>Full screenshot was sent to admin email.</p>
+                          </span>
+                        </div>
                       ) : (
                         <div className="order-attachment is-empty">
                           <span>
@@ -466,7 +501,7 @@ export function AdminPanel() {
                         <button
                           className="approve-button"
                           type="button"
-                          onClick={() => approveOrder(order.id)}
+                          onClick={() => approveOrder(order)}
                           disabled={order.status === "Approved" || order.status === "Rejected" || order.status === "Cancelled"}
                         >
                           Approve
@@ -499,7 +534,7 @@ export function AdminPanel() {
         <div>
           <p className="eyebrow">Private dashboard</p>
           <h1>Store Control</h1>
-          <p>Products, stock aur price ko yahan se update karo. Changes browser mein save ho jayenge.</p>
+          <p>Update products, stock, and prices from here. Changes will be saved in the browser.</p>
         </div>
         <button className="secondary-button" type="button" onClick={logout}>
           <LogOut size={18} />
@@ -734,21 +769,66 @@ export function AdminPanel() {
             </thead>
             <tbody>
               {products.map((product) => (
-                <tr key={product.id}>
+                <tr className={openProductCategoryId === product.id ? "is-category-open" : ""} key={product.id}>
                   <td>
                     <div className="admin-product-cell">
-                      <Image
-                        src={product.image}
-                        alt={product.name}
-                        width={92}
-                        height={72}
-                        sizes="92px"
-                        unoptimized={product.image.startsWith("data:")}
+                      <label className="admin-product-photo-edit">
+                        <Image
+                          src={product.image}
+                          alt={product.name}
+                          width={92}
+                          height={72}
+                          sizes="92px"
+                          unoptimized={product.image.startsWith("data:")}
+                        />
+                        <span>Change photo</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          aria-label={`Change ${product.name} photo`}
+                          onChange={(event) => handleProductPhotoChange(product.id, event.target.files?.[0])}
+                        />
+                      </label>
+                      <input
+                        className="product-name-input"
+                        value={product.name}
+                        onChange={(event) => updateProduct(product.id, { name: event.target.value })}
+                        aria-label={`${product.name} name`}
                       />
-                      <strong>{product.name}</strong>
                     </div>
                   </td>
-                  <td>{product.category}</td>
+                  <td>
+                    <div
+                      className={`admin-row-category-picker ${openProductCategoryId === product.id ? "is-open" : ""}`}
+                      onBlur={() => setOpenProductCategoryId("")}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setOpenProductCategoryId((current) => (current === product.id ? "" : product.id))}
+                        aria-expanded={openProductCategoryId === product.id}
+                        aria-label={`${product.name} category`}
+                      >
+                        <span>{product.category}</span>
+                        <span className="category-chevron">⌄</span>
+                      </button>
+                      <div className="admin-row-category-menu">
+                        {CATEGORIES.map((category, index) => (
+                          <button
+                            key={category}
+                            type="button"
+                            style={{ "--category-option-index": index }}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => {
+                              updateProduct(product.id, { category });
+                              setOpenProductCategoryId("");
+                            }}
+                          >
+                            {category}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </td>
                   <td>
                     <input
                       className="tag-input"

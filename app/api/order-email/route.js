@@ -13,14 +13,14 @@ const ACTION_CONFIG = {
   approved: {
     subject: (order) => `Order confirmed - ${order.id}`,
     title: "Order Confirmed",
-    eyebrow: "Mint Lane Cards",
+    eyebrow: "Freaking Collectibles",
     intro: "Your order has been approved. The seller will prepare it for dispatch.",
     toCustomer: true
   },
   rejected: {
     subject: (order) => `Order update - ${order.id}`,
     title: "Order Rejected",
-    eyebrow: "Mint Lane Cards",
+    eyebrow: "Freaking Collectibles",
     intro: "Your order could not be approved. Please contact the seller if you need help.",
     toCustomer: true
   }
@@ -124,6 +124,7 @@ function buildHtml(action, order) {
   const screenshotText = order.paymentScreenshot?.name
     ? `Attached: ${escapeHtml(order.paymentScreenshot.name)}`
     : "No payment screenshot attached";
+  const paymentUtr = order.paymentUtr ? escapeHtml(order.paymentUtr) : "Not provided";
 
   return `
     <div style="margin:0;padding:0;background:#f7f8f5;font-family:Georgia,'Times New Roman',serif;color:#111815;">
@@ -185,6 +186,13 @@ function buildHtml(action, order) {
                       <td style="padding:14px;border:1px solid #e2e5df;border-radius:10px;background:#fff;">
                         <p style="margin:0 0 4px;color:#00796b;font-weight:900;text-transform:uppercase;font-size:12px;">Payment Screenshot</p>
                         <strong>${screenshotText}</strong>
+                      </td>
+                    </tr>
+                    <tr><td style="height:10px;"></td></tr>
+                    <tr>
+                      <td style="padding:14px;border:1px solid #e2e5df;border-radius:10px;background:#fff;">
+                        <p style="margin:0 0 4px;color:#00796b;font-weight:900;text-transform:uppercase;font-size:12px;">UTR Number</p>
+                        <strong>${paymentUtr}</strong>
                       </td>
                     </tr>
                   </table>
@@ -262,7 +270,7 @@ async function smtpCommand(socket, command, expectedCodes) {
 
 async function sendGmailSmtpEmail({ user, appPassword, from, to, subject, html, attachments }) {
   const requestedFromAddress = parseEmailAddress(from);
-  const safeFrom = requestedFromAddress === user ? from : `Mint Lane Cards <${user}>`;
+  const safeFrom = requestedFromAddress === user ? from : `Freaking Collectibles <${user}>`;
   const socket = tls.connect(465, "smtp.gmail.com", { servername: "smtp.gmail.com" });
 
   try {
@@ -297,7 +305,7 @@ export async function POST(request) {
   const smtpUser = process.env.SMTP_USER;
   const smtpAppPassword = process.env.SMTP_APP_PASSWORD;
   const adminEmail = process.env.ADMIN_ORDER_EMAIL;
-  const from = process.env.FROM_EMAIL || "Mint Lane Cards <onboarding@resend.dev>";
+  const from = process.env.FROM_EMAIL || "Freaking Collectibles <onboarding@resend.dev>";
 
   if ((!smtpUser || !smtpAppPassword) && !apiKey) {
     return NextResponse.json({ error: "Email env missing" }, { status: 500 });

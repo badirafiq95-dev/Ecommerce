@@ -9,6 +9,7 @@ import { Header } from "../../../../components/Header";
 import { useCustomerAuth } from "../../../../components/CustomerAuthProvider";
 import { listenCustomerOrders } from "../../../../lib/firebaseClient";
 import { formatPrice } from "../../../../lib/format";
+import { readCustomerLocalOrders } from "../../../../lib/orders";
 
 function getOrderDisplay(status) {
   if (status === "Approved") {
@@ -65,10 +66,22 @@ export default function CustomerOrderDetailPage() {
   useEffect(() => {
     if (!user) return undefined;
     setOrdersLoaded(false);
-    return listenCustomerOrders(user.uid, (nextOrders) => {
+    const syncLocalOrders = () => {
+      setOrders(readCustomerLocalOrders(user.uid, user.email));
+      setOrdersLoaded(true);
+    };
+    syncLocalOrders();
+    const stopOrders = listenCustomerOrders(user.uid, (nextOrders) => {
       setOrders(nextOrders);
       setOrdersLoaded(true);
-    });
+    }, user.email);
+    window.addEventListener("mint-lane-orders-updated", syncLocalOrders);
+    window.addEventListener("storage", syncLocalOrders);
+    return () => {
+      stopOrders();
+      window.removeEventListener("mint-lane-orders-updated", syncLocalOrders);
+      window.removeEventListener("storage", syncLocalOrders);
+    };
   }, [user]);
 
   const order = useMemo(() => orders.find((currentOrder) => currentOrder.id === orderId), [orderId, orders]);

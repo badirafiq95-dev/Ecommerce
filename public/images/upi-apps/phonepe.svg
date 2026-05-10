@@ -1,0 +1,5 @@
+<svg width="96" height="30" viewBox="0 0 96 30" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="PhonePe">
+  <circle cx="15" cy="15" r="12" fill="#5F259F"/>
+  <path d="M9.7 8.4h10.4v2.3h-7.6v3.1h5.4c2.8 0 4.8 1.7 4.8 4.2s-2 4.3-5 4.3h-3.2v-2.4h3.1c1.3 0 2.2-.8 2.2-1.9s-.9-1.8-2.2-1.8h-5.1v6.1H9.7V8.4Z" fill="white"/>
+  <text x="32" y="20.2" fill="#282232" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="800" letter-spacing="-0.5">PhonePe</text>
+</svg>
