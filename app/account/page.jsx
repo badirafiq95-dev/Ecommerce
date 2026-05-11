@@ -110,6 +110,40 @@ function getReadableDate(value) {
   return Number.isNaN(date.getTime()) ? "Recently" : date.toLocaleString();
 }
 
+function normalizePincode(value) {
+  return String(value || "").replace(/\D/g, "").slice(0, 6);
+}
+
+function normalizeAddressPhone(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  const localDigits = digits.length > 10 && digits.startsWith("91") ? digits.slice(2) : digits;
+  return localDigits.slice(0, 10);
+}
+
+function matchIndianState(value) {
+  const normalizedValue = String(value || "").toLowerCase().replace(/&/g, "and").replace(/\s+/g, " ").trim();
+  return INDIA_STATES.find((state) => state.toLowerCase().replace(/&/g, "and").replace(/\s+/g, " ").trim() === normalizedValue) || "";
+}
+
+async function lookupPincodeDetails(pincode, signal) {
+  const normalizedPincode = normalizePincode(pincode);
+  if (normalizedPincode.length !== 6) return null;
+
+  const response = await fetch(`https://api.postalpincode.in/pincode/${normalizedPincode}`, { signal });
+  if (!response.ok) throw new Error("Pincode lookup failed");
+
+  const [result] = await response.json();
+  const postOffice = result?.PostOffice?.[0];
+  if (result?.Status !== "Success" || !postOffice) return null;
+
+  return {
+    pincode: normalizedPincode,
+    locality: postOffice.Name || postOffice.Block || "",
+    city: postOffice.District || postOffice.Division || "",
+    state: matchIndianState(postOffice.State) || postOffice.State || ""
+  };
+}
+
 function authErrorMessage(error) {
   if (error?.code === "auth/unauthorized-domain") {
     const currentDomain =
@@ -348,6 +382,7 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
   const [notice, setNotice] = useState("");
   const [noticeToken, setNoticeToken] = useState(0);
   const [addressNotice, setAddressNotice] = useState("");
+  const [addressAssist, setAddressAssist] = useState({ tone: "", message: "" });
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const baseName = profile?.name || user.displayName || user.email?.split("@")[0] || "";
   const { firstName, lastName } = splitProfileName(baseName);
@@ -378,6 +413,43 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
       if (profileNoticeTimerRef.current) window.clearTimeout(profileNoticeTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!isAddressFormOpen) return undefined;
+    const pincode = normalizePincode(addressForm.pincode);
+    if (pincode.length !== 6) {
+      setAddressAssist({ tone: "", message: "" });
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    setAddressAssist({ tone: "loading", message: "Finding address details..." });
+    lookupPincodeDetails(pincode, controller.signal)
+      .then((details) => {
+        if (!details) {
+          setAddressAssist({ tone: "error", message: "Pincode details not found." });
+          return;
+        }
+
+        setAddressForm((current) => {
+          if (normalizePincode(current.pincode) !== pincode) return current;
+          return {
+            ...current,
+            pincode,
+            locality: details.locality || current.locality,
+            city: details.city || current.city,
+            state: details.state || current.state
+          };
+        });
+        setAddressAssist({ tone: "success", message: "City and state filled from pincode." });
+      })
+      .catch((error) => {
+        if (error?.name === "AbortError") return;
+        setAddressAssist({ tone: "error", message: "Could not fetch pincode details." });
+      });
+
+    return () => controller.abort();
+  }, [addressForm.pincode, isAddressFormOpen]);
 
   useEffect(() => {
     if (profile) return;
@@ -477,7 +549,7 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
   const resetAddressForm = () => {
     setAddressForm({
       name: "",
-      phone: profile?.phone || "",
+      phone: normalizeAddressPhone(profile?.phone || ""),
       pincode: "",
       locality: "",
       line: "",
@@ -487,6 +559,7 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
       alternatePhone: "",
       label: "Home"
     });
+    setAddressAssist({ tone: "", message: "" });
   };
 
   const addAddressDraft = () => {
@@ -503,16 +576,17 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
     setEditingAddressIndex(index);
     setAddressForm({
       name: address.name || baseName || "",
-      phone: address.phone || profile?.phone || "",
+      phone: normalizeAddressPhone(address.phone || profile?.phone || ""),
       pincode: address.pincode || "",
       locality: address.locality || "",
       line: address.line || "",
       city: address.city || "",
       state: address.state || "",
       landmark: address.landmark || "",
-      alternatePhone: address.alternatePhone || "",
+      alternatePhone: normalizeAddressPhone(address.alternatePhone || ""),
       label: address.label || "Home"
     });
+    setAddressAssist({ tone: "", message: "" });
     setIsAddressFormOpen(true);
     setIsStateMenuOpen(false);
     setIsStateMenuPinned(false);
@@ -532,10 +606,16 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
   const saveAddressForm = async (event) => {
     event.preventDefault();
     setIsSavingAddress(true);
-    const nextAddress = {
+    const normalizedAddressForm = {
       ...addressForm,
-      label: addressForm.label || "Home",
-      line: formatAddressLine(addressForm)
+      phone: normalizeAddressPhone(addressForm.phone),
+      alternatePhone: normalizeAddressPhone(addressForm.alternatePhone),
+      pincode: normalizePincode(addressForm.pincode)
+    };
+    const nextAddress = {
+      ...normalizedAddressForm,
+      label: normalizedAddressForm.label || "Home",
+      line: formatAddressLine(normalizedAddressForm)
     };
     const nextAddresses =
       editingAddressIndex === null
@@ -554,6 +634,7 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
       setIsSavingAddress(false);
       setIsAddressFormOpen(false);
       setEditingAddressIndex(null);
+      setAddressAssist({ tone: "", message: "" });
     }, 650);
   };
 
@@ -645,10 +726,27 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
             <form className="address-entry-form" onSubmit={saveAddressForm}>
               <p>ADD A NEW ADDRESS</p>
               <button className="address-location-button" type="button">Use my current location</button>
+              {addressAssist.message ? (
+                <p className={`address-autofill-status ${addressAssist.tone ? `is-${addressAssist.tone}` : ""}`} role="status">
+                  {addressAssist.message}
+                </p>
+              ) : null}
               <div className="address-entry-grid">
                 <input value={addressForm.name} onChange={(event) => setAddressForm((current) => ({ ...current, name: event.target.value }))} placeholder="Name" required />
-                <input value={addressForm.phone} onChange={(event) => setAddressForm((current) => ({ ...current, phone: event.target.value }))} placeholder="10-digit mobile number" />
-                <input value={addressForm.pincode} onChange={(event) => setAddressForm((current) => ({ ...current, pincode: event.target.value }))} placeholder="Pincode" />
+                <input
+                  value={addressForm.phone}
+                  onChange={(event) => setAddressForm((current) => ({ ...current, phone: normalizeAddressPhone(event.target.value) }))}
+                  placeholder="10-digit mobile number"
+                  inputMode="numeric"
+                  maxLength={10}
+                />
+                <input
+                  value={addressForm.pincode}
+                  onChange={(event) => setAddressForm((current) => ({ ...current, pincode: normalizePincode(event.target.value) }))}
+                  placeholder="Pincode"
+                  inputMode="numeric"
+                  maxLength={6}
+                />
                 <input value={addressForm.locality} onChange={(event) => setAddressForm((current) => ({ ...current, locality: event.target.value }))} placeholder="Locality" />
                 <textarea value={addressForm.line} onChange={(event) => setAddressForm((current) => ({ ...current, line: event.target.value }))} placeholder="Address (Area and Street)" rows={4} required />
                 <input value={addressForm.city} onChange={(event) => setAddressForm((current) => ({ ...current, city: event.target.value }))} placeholder="City/District/Town" />
@@ -708,7 +806,13 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
                   ) : null}
                 </div>
                 <input value={addressForm.landmark} onChange={(event) => setAddressForm((current) => ({ ...current, landmark: event.target.value }))} placeholder="Landmark (Optional)" />
-                <input value={addressForm.alternatePhone} onChange={(event) => setAddressForm((current) => ({ ...current, alternatePhone: event.target.value }))} placeholder="Alternate Phone (Optional)" />
+                <input
+                  value={addressForm.alternatePhone}
+                  onChange={(event) => setAddressForm((current) => ({ ...current, alternatePhone: normalizeAddressPhone(event.target.value) }))}
+                  placeholder="Alternate Phone (Optional)"
+                  inputMode="numeric"
+                  maxLength={10}
+                />
               </div>
               <div className="address-type-options">
                 <span>Address Type</span>

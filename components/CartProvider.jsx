@@ -186,6 +186,7 @@ export function CartProvider({ children }) {
       appliedCoupon,
       coupons,
       couponNotice,
+      ready,
       isOpen,
       setIsOpen,
       addItem,

@@ -64,6 +64,37 @@ const EMPTY_ADDRESS = {
   alternatePhone: "",
   label: "Home"
 };
+
+const CHECKOUT_SUCCESS_SESSION_KEY = "freaking-collectibles-checkout-success";
+
+function readCheckoutSuccessSession() {
+  if (typeof window === "undefined") return null;
+  try {
+    const stored = window.sessionStorage.getItem(CHECKOUT_SUCCESS_SESSION_KEY);
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCheckoutSuccessSession(orderId) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(
+      CHECKOUT_SUCCESS_SESSION_KEY,
+      JSON.stringify({ orderId, completedAt: Date.now() })
+    );
+  } catch {
+    // Session restore is a nice-to-have; the order itself is already saved.
+  }
+}
+
+function replaceCheckoutHistoryWithSuccess(orderId) {
+  if (typeof window === "undefined") return;
+  const successPath = `/checkout?success=${encodeURIComponent(orderId)}`;
+  window.history.replaceState({ ...(window.history.state || {}), checkoutSuccessOrderId: orderId }, "", successPath);
+}
+
 function normalizePincode(value) {
   return String(value || "").replace(/\D/g, "").slice(0, 6);
 }
@@ -184,7 +215,7 @@ function waitForOrderConfirmationReveal() {
 }
 
 export function CheckoutForm() {
-  const { items, subtotal, shippingCharge, discountAmount, total, appliedCoupon, clearCart } = useCart();
+  const { items, subtotal, shippingCharge, discountAmount, total, appliedCoupon, clearCart, ready: isCartReady } = useCart();
   const { user, loading: authLoading } = useCustomerAuth();
   const { products, reduceStock } = useProductCatalog();
   const router = useRouter();
@@ -202,6 +233,31 @@ export function CheckoutForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [paymentFileName, setPaymentFileName] = useState("");
   const paymentSubmitLockedRef = useRef(false);
+
+  useEffect(() => {
+    const successId = new URLSearchParams(window.location.search).get("success");
+    const storedSuccess = readCheckoutSuccessSession();
+    const isRecentSuccess =
+      storedSuccess?.orderId &&
+      Date.now() - Number(storedSuccess.completedAt || 0) < 24 * 60 * 60 * 1000;
+
+    if (!successId && !submitted && isCartReady && items.length === 0 && isRecentSuccess) {
+      router.replace(`/checkout?success=${encodeURIComponent(storedSuccess.orderId)}`, { scroll: false });
+      setOrderId(storedSuccess.orderId);
+      setSubmitted(true);
+      return;
+    }
+
+    if (!successId || submitted) return;
+
+    if (!isRecentSuccess || storedSuccess.orderId !== successId) {
+      router.replace("/");
+      return;
+    }
+
+    setOrderId(successId);
+    setSubmitted(true);
+  }, [isCartReady, items.length, router, submitted]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -454,6 +510,9 @@ export function CheckoutForm() {
       });
 
       await waitForOrderConfirmationReveal();
+      writeCheckoutSuccessSession(id);
+      replaceCheckoutHistoryWithSuccess(id);
+      router.replace(`/checkout?success=${encodeURIComponent(id)}`, { scroll: false });
       setSubmitted(true);
       clearCart();
     } catch (submitError) {
@@ -489,8 +548,8 @@ export function CheckoutForm() {
             <strong>{orderId}</strong>
           </div>
           <div className="order-success-actions">
-            <Link className="primary-button" href={`/account/orders/${orderId}`}>View order</Link>
-            <Link className="success-secondary-button" href="/">Continue shopping</Link>
+            <Link className="primary-button" href={`/account/orders/${orderId}?from=success`} replace>View order</Link>
+            <Link className="success-secondary-button" href="/" replace>Continue shopping</Link>
           </div>
         </section>
       </main>
