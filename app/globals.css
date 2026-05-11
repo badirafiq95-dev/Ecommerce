@@ -858,6 +858,19 @@ img {
   transform: translateY(0) scale(1);
 }
 
+.profile-menu.is-profile-menu-dismissed .profile-dropdown,
+.profile-menu.is-profile-menu-dismissed:hover .profile-dropdown,
+.profile-menu.is-profile-menu-dismissed:focus-within .profile-dropdown,
+.profile-menu.is-profile-menu-dismissed.is-profile-menu-open .profile-dropdown {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateY(8px) scale(0.98) !important;
+}
+
+.profile-menu.is-profile-menu-dismissed:hover .profile-menu-link svg:last-child {
+  transform: rotate(0deg) !important;
+}
+
 .profile-menu.is-guest:hover .profile-dropdown {
   pointer-events: none;
 }

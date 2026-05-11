@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Home, MessageCircle, UserRound } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { CartDrawer } from "../../../../components/CartDrawer";
@@ -54,7 +54,9 @@ function getOrderDisplay(status) {
 export default function CustomerOrderDetailPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const orderId = params?.orderId;
+  const cameFromSuccess = searchParams.get("from") === "success";
   const { user, loading } = useCustomerAuth();
   const [orders, setOrders] = useState([]);
   const [ordersLoaded, setOrdersLoaded] = useState(false);
@@ -92,6 +94,14 @@ export default function CustomerOrderDetailPage() {
   const deliveryAddress = order?.address || "No saved delivery address linked to this order.";
   const customerName = order?.customerName || user?.displayName || "Customer";
   const customerPhone = order?.phone || "Phone not added";
+  const handleBack = () => {
+    if (cameFromSuccess && orderId) {
+      router.replace(`/checkout?success=${encodeURIComponent(orderId)}`);
+      return;
+    }
+
+    router.back();
+  };
 
   return (
     <>
@@ -101,7 +111,7 @@ export default function CustomerOrderDetailPage() {
       </div>
       <main className="order-detail-shell">
         <header className="mobile-orders-topbar mobile-order-detail-topbar">
-          <button type="button" onClick={() => router.back()} aria-label="Back">
+          <button type="button" onClick={handleBack} aria-label="Back">
             <ArrowLeft size={24} />
           </button>
           <h1>Order Details</h1>

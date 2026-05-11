@@ -25,6 +25,8 @@ import { useCustomerAuth } from "./CustomerAuthProvider";
 import { getAdminAccessExiting, getAdminSession } from "../lib/adminSession";
 import { logoutCustomer } from "../lib/firebaseClient";
 
+const BRAND_HOME_SCROLL_KEY = "freaking-collectibles-brand-home-scroll";
+
 export function Header() {
   const router = useRouter();
   const pathname = usePathname();
@@ -36,6 +38,7 @@ export function Header() {
   const [isCustomerLoggingOut, setIsCustomerLoggingOut] = useState(false);
   const [isHelpOpening, setIsHelpOpening] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isProfileMenuDismissed, setIsProfileMenuDismissed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [profileMenuStyle, setProfileMenuStyle] = useState({});
   const secretClickRef = useRef({ count: 0, timer: null });
@@ -60,7 +63,20 @@ export function Header() {
 
   useEffect(() => {
     setIsProfileMenuOpen(false);
+    setIsProfileMenuDismissed(false);
     setIsMobileMenuOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (pathname !== "/" || typeof window === "undefined") return;
+    const shouldScrollTop = window.sessionStorage.getItem(BRAND_HOME_SCROLL_KEY);
+    if (!shouldScrollTop) return;
+
+    window.sessionStorage.removeItem(BRAND_HOME_SCROLL_KEY);
+    window.requestAnimationFrame(() => {
+      window.history.replaceState(null, "", "/");
+      window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+    });
   }, [pathname]);
 
   useEffect(() => {
@@ -177,14 +193,22 @@ export function Header() {
   };
 
   const handleBrandHomeClick = (event) => {
+    event.preventDefault();
     event.stopPropagation();
+    setIsProfileMenuOpen(false);
+    setIsProfileMenuDismissed(false);
+    setIsMobileMenuOpen(false);
+    setIsOpen(false);
 
     if (pathname === "/") {
-      event.preventDefault();
+      window.history.replaceState(null, "", "/");
+      window.requestAnimationFrame(() => {
+        window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+      });
       return;
     }
 
-    event.preventDefault();
+    window.sessionStorage.setItem(BRAND_HOME_SCROLL_KEY, "true");
     router.push("/");
   };
 
@@ -218,16 +242,36 @@ export function Header() {
     }, 760);
   };
 
+  const closeProfileMenuAfterAction = () => {
+    setIsProfileMenuOpen(false);
+    setIsProfileMenuDismissed(true);
+    profileTriggerRef.current?.blur();
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+  };
+
   const handleProfileOpen = () => {
-    if (user) router.push("/account?view=profile");
+    if (!user) return;
+    closeProfileMenuAfterAction();
+    setIsMobileMenuOpen(false);
+    if (pathname === "/account") {
+      window.dispatchEvent(new CustomEvent("mint-lane-account-section", { detail: { section: "profile" } }));
+    }
+    router.push("/account?view=profile&section=profile");
   };
 
   const handleOrdersOpen = () => {
-    if (user) router.push("/account/orders");
+    if (!user) return;
+    closeProfileMenuAfterAction();
+    setIsMobileMenuOpen(false);
+    router.push("/account/orders");
   };
 
   const handleProfileSectionOpen = (section) => {
     if (!user) return;
+    closeProfileMenuAfterAction();
+    setIsMobileMenuOpen(false);
     if (pathname === "/account") {
       window.dispatchEvent(new CustomEvent("mint-lane-account-section", { detail: { section } }));
     }
@@ -260,10 +304,12 @@ export function Header() {
 
     if (!user) {
       setIsProfileMenuOpen(false);
+      setIsProfileMenuDismissed(false);
       router.push("/account?next=/");
       return;
     }
 
+    setIsProfileMenuDismissed(false);
     positionMobileProfileMenu(event.currentTarget);
     setIsProfileMenuOpen((current) => !current);
   };
@@ -277,15 +323,18 @@ export function Header() {
     if (window.matchMedia("(max-width: 768px)").matches) {
       if (!user) {
         setIsProfileMenuOpen(false);
+        setIsProfileMenuDismissed(false);
         router.push("/account?next=/");
         return;
       }
 
+      setIsProfileMenuDismissed(false);
       positionMobileProfileMenu(event.currentTarget);
       setIsProfileMenuOpen((current) => !current);
       return;
     }
 
+    setIsProfileMenuDismissed(false);
     if (!user) router.push("/account");
   };
 
@@ -369,9 +418,10 @@ export function Header() {
         <div
           className={`profile-menu ${user ? "is-customer-logged-in" : "is-guest"} ${
             isProfileMenuOpen ? "is-profile-menu-open" : ""
-          }`}
+          } ${isProfileMenuDismissed ? "is-profile-menu-dismissed" : ""}`}
           ref={profileMenuRef}
           style={profileMenuStyle}
+          onMouseLeave={() => setIsProfileMenuDismissed(false)}
         >
           <button
             className="demo-icon-link profile-menu-link"
