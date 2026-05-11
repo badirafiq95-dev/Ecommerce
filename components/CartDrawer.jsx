@@ -117,9 +117,9 @@ export function CartDrawer() {
     handleRemove(item);
   };
 
-  const handleCouponSubmit = (event) => {
+  const handleCouponSubmit = async (event) => {
     event.preventDefault();
-    const applied = applyCoupon(couponCode);
+    const applied = await applyCoupon(couponCode);
     setCouponNoticeToken(Date.now());
     if (applied) setCouponCode("");
   };

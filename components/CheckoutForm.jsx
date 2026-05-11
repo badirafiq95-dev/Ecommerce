@@ -498,7 +498,7 @@ export function CheckoutForm() {
       setOrderId(id);
 
       void Promise.allSettled([
-        saveCustomerOrder(storedOrder, user),
+        saveCustomerOrder(order, user),
         sendOrderEmail("created", order)
       ]).then(([cloudSave, emailSave]) => {
         if (cloudSave.status === "rejected") {

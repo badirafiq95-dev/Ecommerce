@@ -8,11 +8,11 @@ import { CartDrawer } from "../../components/CartDrawer";
 import { Header } from "../../components/Header";
 import { useCustomerAuth } from "../../components/CustomerAuthProvider";
 import {
+  auth,
   listenCustomerOrders,
   listenCustomerProfile,
   loginWithGoogle,
   logoutCustomer,
-  updateFirestoreOrder,
   upsertCustomerProfile
 } from "../../lib/firebaseClient";
 import { formatPrice } from "../../lib/format";
@@ -243,10 +243,14 @@ function CustomerDashboard({ user }) {
 
   const requestCancel = async (order) => {
     if (!cancelReason.trim()) return;
-    await updateFirestoreOrder(order.id, {
-      status: "Cancel requested",
-      cancelReason: cancelReason.trim(),
-      cancelRequestedAt: new Date().toISOString()
+    const token = await auth.currentUser?.getIdToken();
+    await fetch(`/api/orders/${order.id}/cancel`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ cancelReason: cancelReason.trim() })
     });
     setCancelOrderId("");
     setCancelReason("");
