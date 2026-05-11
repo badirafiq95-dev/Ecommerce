@@ -14523,3 +14523,23 @@ h2 {
     scrollbar-width: none !important;
   }
 }
+
+/* Final account menu dismissal lock across desktop, tablet, and mobile. */
+.profile-menu.is-profile-menu-dismissed .profile-dropdown,
+.profile-menu.is-profile-menu-dismissed:hover .profile-dropdown,
+.profile-menu.is-profile-menu-dismissed:focus-within .profile-dropdown,
+.profile-menu.is-profile-menu-dismissed.is-profile-menu-open .profile-dropdown,
+.demo-site-header:not(.is-admin-route) .profile-menu.is-profile-menu-dismissed .profile-dropdown,
+.demo-site-header:not(.is-admin-route) .profile-menu.is-profile-menu-dismissed:hover .profile-dropdown,
+.demo-site-header:not(.is-admin-route) .profile-menu.is-profile-menu-dismissed:focus-within .profile-dropdown,
+.demo-site-header:not(.is-admin-route) .profile-menu.is-profile-menu-dismissed.is-profile-menu-open .profile-dropdown {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateY(-8px) scale(0.98) !important;
+}
+
+.profile-menu.is-profile-menu-dismissed:hover .profile-menu-link svg:last-child,
+.profile-menu.is-profile-menu-dismissed:focus-within .profile-menu-link svg:last-child {
+  transform: rotate(0deg) !important;
+}
