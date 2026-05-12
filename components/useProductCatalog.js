@@ -1,39 +1,45 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import defaultProducts from "../data/products.json";
+import { getDefaultProducts, normalizeProduct, normalizeProducts } from "../lib/productCatalogData";
 
 export const PRODUCT_STORAGE_KEY = "mint-lane-products";
-const DEFAULT_IMAGE = "/images/hero-cards.png";
-
-function normalizeProduct(product) {
-  return {
-    ...product,
-    price: Math.max(0, Number(product.price) || 0),
-    stock: Math.max(0, Number(product.stock) || 0),
-    image: product.image || DEFAULT_IMAGE,
-    tag: product.tag || "New"
-  };
-}
 
 function readProducts() {
+  const defaultProducts = getDefaultProducts();
   if (typeof window === "undefined") return defaultProducts;
 
   try {
     const saved = localStorage.getItem(PRODUCT_STORAGE_KEY);
     if (!saved) return defaultProducts;
     const parsed = JSON.parse(saved);
-    return Array.isArray(parsed) ? parsed.map(normalizeProduct) : defaultProducts;
+    return Array.isArray(parsed) ? normalizeProducts(parsed) : defaultProducts;
   } catch {
     return defaultProducts;
   }
 }
 
 export function useProductCatalog() {
-  const [products, setProducts] = useState(defaultProducts);
+  const [products, setProducts] = useState(getDefaultProducts());
 
   useEffect(() => {
     setProducts(readProducts());
+    let ignore = false;
+
+    fetch("/api/products")
+      .then((response) => response.json())
+      .then((data) => {
+        if (ignore || !Array.isArray(data.products)) return;
+        const normalized = normalizeProducts(data.products);
+        setProducts(normalized);
+        localStorage.setItem(PRODUCT_STORAGE_KEY, JSON.stringify(normalized));
+        window.dispatchEvent(new Event("mint-lane-products-updated"));
+      })
+      .catch(() => {});
+
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   const saveProducts = useCallback((nextProducts) => {
@@ -77,7 +83,6 @@ export function useProductCatalog() {
         ...products,
         normalizeProduct({
           id: `product-${Date.now()}`,
-          image: DEFAULT_IMAGE,
           ...product
         })
       ]);
@@ -119,7 +124,7 @@ export function useProductCatalog() {
   );
 
   const resetProducts = useCallback(() => {
-    saveProducts(defaultProducts);
+    saveProducts(getDefaultProducts());
   }, [saveProducts]);
 
   const saveChanges = useCallback(() => {

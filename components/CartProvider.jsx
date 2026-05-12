@@ -145,18 +145,31 @@ export function CartProvider({ children }) {
     );
   };
 
-  const applyCoupon = (code) => {
+  const applyCoupon = async (code) => {
     const normalizedCode = String(code || "").trim().toUpperCase();
-    const coupon = findCouponByCode(normalizedCode, coupons);
 
-    if (!coupon) {
+    try {
+      const response = await fetch("/api/coupons/validate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ code: normalizedCode, subtotal, shippingCharge })
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || !data.coupon) {
+        showCouponNotice("Invalid coupon.", 1500);
+        return false;
+      }
+
+      setAppliedCoupon(data.coupon);
+      showCouponNotice(`${data.coupon.code} applied successfully.`);
+      return true;
+    } catch {
       showCouponNotice("Invalid coupon.", 1500);
       return false;
     }
-
-    setAppliedCoupon(coupon);
-    showCouponNotice(`${coupon.code} applied successfully.`);
-    return true;
   };
 
   const removeCoupon = () => {

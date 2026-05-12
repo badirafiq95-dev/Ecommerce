@@ -27,11 +27,10 @@ import { APPLIED_COUPON_STORAGE_KEY, normalizeCouponCode, readCoupons, saveCoupo
 import { getAdminSession, setAdminSession, startAdminAccessExit } from "../lib/adminSession";
 import { clearActiveOrders, clearRejectedOrders, mergeOrderLists, readOrders, updateOrderStatus } from "../lib/orders";
 import { sendOrderEmail } from "../lib/orderEmail";
-import { listenAllOrders, updateFirestoreOrder } from "../lib/firebaseClient";
+import { listenToAuth, loginWithEmail, logoutCustomer } from "../lib/firebaseClient";
+import { adminFetchJson } from "../lib/adminApiClient";
 import { useProductCatalog } from "./useProductCatalog";
 
-const ADMIN_ID = "admin";
-const ADMIN_PASSWORD = "admin123";
 const DEFAULT_IMAGE = "/images/hero-cards.png";
 const CATEGORIES = ["Singles", "Sealed", "Graded", "Supplies"];
 
@@ -80,7 +79,6 @@ export function AdminPanel() {
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-    setIsAuthed(getAdminSession());
     setOrders(readOrders());
     setCoupons(readCoupons());
     if (window.sessionStorage.getItem("mint-lane-secret-admin-entry") === "true") {
@@ -89,6 +87,37 @@ export function AdminPanel() {
       window.setTimeout(() => setSecretEntry(false), 1400);
     }
   }, []);
+
+  useEffect(() => {
+    return listenToAuth(async (user) => {
+      if (!user) {
+        setAdminSession(false);
+        setIsAuthed(false);
+        return;
+      }
+
+      try {
+        await adminFetchJson("/api/admin/session");
+        setAdminSession(true);
+        setIsAuthed(true);
+      } catch {
+        setAdminSession(false);
+        setIsAuthed(false);
+      }
+    });
+  }, []);
+
+  const loadAdminOrders = async () => {
+    const data = await adminFetchJson("/api/admin/orders");
+    setOrders((currentOrders) => mergeOrderLists(readOrders(), currentOrders, data.orders || []));
+  };
+
+  const loadAdminCoupons = async () => {
+    const data = await adminFetchJson("/api/admin/coupons");
+    const nextCoupons = data.coupons || readCoupons();
+    saveCoupons(nextCoupons);
+    setCoupons(nextCoupons);
+  };
 
   useEffect(() => {
     const syncCoupons = () => setCoupons(readCoupons());
@@ -101,48 +130,65 @@ export function AdminPanel() {
   }, []);
 
   useEffect(() => {
-    const syncOrders = () => setOrders((currentOrders) => mergeOrderLists(readOrders(), currentOrders));
-    const stopFirestoreOrders = listenAllOrders((cloudOrders) => {
-      setOrders((currentOrders) => mergeOrderLists(readOrders(), currentOrders, cloudOrders));
+    if (!isAuthed) return undefined;
+
+    loadAdminOrders().catch((error) => {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("[Admin] Orders fetch failed:", error?.message || error);
+      }
     });
+    loadAdminCoupons().catch((error) => {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("[Admin] Coupons fetch failed:", error?.message || error);
+      }
+    });
+
+    const syncOrders = () => setOrders((currentOrders) => mergeOrderLists(readOrders(), currentOrders));
+    const refreshTimer = window.setInterval(() => {
+      loadAdminOrders().catch(() => {});
+    }, 12000);
     window.addEventListener("mint-lane-orders-updated", syncOrders);
     window.addEventListener("storage", syncOrders);
     return () => {
-      stopFirestoreOrders();
+      window.clearInterval(refreshTimer);
       window.removeEventListener("mint-lane-orders-updated", syncOrders);
       window.removeEventListener("storage", syncOrders);
     };
-  }, []);
+  }, [isAuthed]);
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const adminId = String(form.get("adminId") || "").trim();
+    const email = String(form.get("email") || "").trim();
     const password = String(form.get("password") || "");
 
-    if (!adminId || !password) {
+    if (!email || !password) {
       setError("");
       window.requestAnimationFrame(() => {
-        setError("Oops, admin ID and password required");
+        setError("Admin email and password are required");
       });
       return;
     }
 
-    if (adminId === ADMIN_ID && password === ADMIN_PASSWORD) {
+    try {
       setError("");
       setIsVerifying(true);
+      await loginWithEmail(email, password);
+      await adminFetchJson("/api/admin/session");
       window.setTimeout(() => {
         setAdminSession(true);
         setIsAuthed(true);
         setIsVerifying(false);
       }, 1550);
-      return;
+    } catch (loginError) {
+      setIsVerifying(false);
+      setAdminSession(false);
+      setIsAuthed(false);
+      setError("");
+      window.requestAnimationFrame(() => {
+        setError(loginError?.message || "Admin access denied");
+      });
     }
-
-    setError("");
-    window.requestAnimationFrame(() => {
-      setError("Wrong ID or password");
-    });
   };
 
   const logout = () => {
@@ -150,6 +196,7 @@ export function AdminPanel() {
     setIsLoggingOut(true);
     window.setTimeout(() => {
       setAdminSession(false);
+      logoutCustomer().catch(() => {});
       router.replace("/");
     }, 1850);
   };
@@ -177,10 +224,19 @@ export function AdminPanel() {
     updateProduct(productId, { image });
   };
 
-  const handleSaveChanges = () => {
+  const handleSaveChanges = async () => {
     saveChanges();
-    setSaveStatus("Changes saved");
-    window.setTimeout(() => setSaveStatus(""), 1800);
+    setSaveStatus("Saving...");
+    try {
+      await adminFetchJson("/api/admin/products", {
+        method: "PUT",
+        body: JSON.stringify({ products })
+      });
+      setSaveStatus("Changes saved securely");
+    } catch (saveError) {
+      setSaveStatus(saveError?.message || "Save failed");
+    }
+    window.setTimeout(() => setSaveStatus(""), 2200);
   };
 
   const approveOrder = (order) => {
@@ -191,14 +247,20 @@ export function AdminPanel() {
     };
     const nextOrders = updateOrderStatus(order.id, "Approved", approvedOrder);
     setOrders((currentOrders) => mergeOrderLists(nextOrders, currentOrders, [approvedOrder]));
-    if (approvedOrder) {
-      updateFirestoreOrder(order.id, approvedOrder).catch((error) => {
+    adminFetchJson(`/api/admin/orders/${order.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "Approved" })
+    })
+      .then((data) => {
+        const syncedOrder = data.order || approvedOrder;
+        setOrders((currentOrders) => mergeOrderLists(currentOrders, [syncedOrder]));
+        sendOrderEmail("approved", syncedOrder);
+      })
+      .catch((error) => {
         if (process.env.NODE_ENV !== "production") {
           console.warn("[Firebase] Order approval sync failed:", error?.message || error);
         }
       });
-      sendOrderEmail("approved", approvedOrder);
-    }
   };
 
   const rejectOrder = (order) => {
@@ -212,14 +274,20 @@ export function AdminPanel() {
     };
     const nextOrders = updateOrderStatus(order.id, "Rejected", rejectedOrder);
     setOrders((currentOrders) => mergeOrderLists(nextOrders, currentOrders, [rejectedOrder]));
-    if (rejectedOrder) {
-      updateFirestoreOrder(order.id, rejectedOrder).catch((error) => {
+    adminFetchJson(`/api/admin/orders/${order.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "Rejected" })
+    })
+      .then((data) => {
+        const syncedOrder = data.order || rejectedOrder;
+        setOrders((currentOrders) => mergeOrderLists(currentOrders, [syncedOrder]));
+        sendOrderEmail("rejected", syncedOrder);
+      })
+      .catch((error) => {
         if (process.env.NODE_ENV !== "production") {
           console.warn("[Firebase] Order rejection sync failed:", error?.message || error);
         }
       });
-      sendOrderEmail("rejected", rejectedOrder);
-    }
   };
 
   const handleClearOrders = () => {
@@ -243,7 +311,16 @@ export function AdminPanel() {
     setCouponMessage("");
   };
 
-  const handleCouponSave = (event) => {
+  const persistCoupons = async (nextCoupons) => {
+    saveCoupons(nextCoupons);
+    setCoupons(nextCoupons);
+    await adminFetchJson("/api/admin/coupons", {
+      method: "PUT",
+      body: JSON.stringify({ coupons: nextCoupons })
+    });
+  };
+
+  const handleCouponSave = async (event) => {
     event.preventDefault();
     const code = normalizeCouponCode(couponDraft.code);
     const value = Number(couponDraft.value);
@@ -264,19 +341,26 @@ export function AdminPanel() {
       type: couponDraft.type,
       value
     };
-    const nextCoupons = saveCoupons([...coupons, nextCoupon]);
-    setCoupons(nextCoupons);
-    setCouponMessage(`${code} saved`);
-    setIsCouponFormOpen(false);
-    setCouponDraft({ code: "", type: "percent", value: "" });
-    window.setTimeout(() => setCouponMessage(""), 1800);
+    try {
+      await persistCoupons([...coupons, nextCoupon]);
+      setCouponMessage(`${code} saved`);
+      setIsCouponFormOpen(false);
+      setCouponDraft({ code: "", type: "percent", value: "" });
+      window.setTimeout(() => setCouponMessage(""), 1800);
+    } catch (couponError) {
+      setCouponMessage(couponError?.message || "Coupon save failed");
+    }
   };
 
   const handleRemoveAllCoupons = () => {
     if (coupons.length === 0 || isRemovingCoupons) return;
     setIsRemovingCoupons(true);
     window.setTimeout(() => {
-      saveCoupons([]);
+      persistCoupons([]).catch((error) => {
+        if (process.env.NODE_ENV !== "production") {
+          console.warn("[Admin] Coupon remove all failed:", error?.message || error);
+        }
+      });
       localStorage.removeItem(APPLIED_COUPON_STORAGE_KEY);
       setCoupons([]);
       setIsRemovingCoupons(false);
@@ -292,8 +376,11 @@ export function AdminPanel() {
     setRemovingCouponId(coupon.id);
     window.setTimeout(() => {
       const nextCoupons = coupons.filter((currentCoupon) => currentCoupon.id !== coupon.id);
-      saveCoupons(nextCoupons);
-      setCoupons(nextCoupons);
+      persistCoupons(nextCoupons).catch((error) => {
+        if (process.env.NODE_ENV !== "production") {
+          console.warn("[Admin] Coupon remove failed:", error?.message || error);
+        }
+      });
 
       if (normalizeCouponCode(localStorage.getItem(APPLIED_COUPON_STORAGE_KEY)) === normalizeCouponCode(coupon.code)) {
         localStorage.removeItem(APPLIED_COUPON_STORAGE_KEY);
@@ -315,13 +402,13 @@ export function AdminPanel() {
           <p className="eyebrow">Owner access</p>
           <h1>Admin Login</h1>
           <p className="admin-login-copy">
-            This store control area is for the owner only. Enter the admin ID and password to continue.
+            This store control area is for verified Firebase admin accounts only.
           </p>
 
           <form className="admin-form" onSubmit={handleSubmit}>
             <label>
-              Admin ID
-              <input name="adminId" autoComplete="username" placeholder="Enter admin ID" />
+              Admin email
+              <input name="email" type="email" autoComplete="username" placeholder="Enter admin email" />
             </label>
             <label>
               Password
@@ -534,7 +621,7 @@ export function AdminPanel() {
         <div>
           <p className="eyebrow">Private dashboard</p>
           <h1>Store Control</h1>
-          <p>Update products, stock, and prices from here. Changes will be saved in the browser.</p>
+          <p>Update products, stock, and prices from here. Changes are saved securely to Firestore.</p>
         </div>
         <button className="secondary-button" type="button" onClick={logout}>
           <LogOut size={18} />

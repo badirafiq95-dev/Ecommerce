@@ -1,5 +1,8 @@
 .env.local
 .env*.local
+.env
+.env.*
+!.env.example
 firebase-service-account.json
 .next
 node_modules

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import tls from "node:tls";
 import { formatPrice } from "../../../lib/format";
+import { isDecodedAdmin, requireFirebaseUser } from "../../../lib/serverAuth";
 
 const ACTION_CONFIG = {
   created: {
@@ -320,6 +321,21 @@ export async function POST(request) {
 
   if (!config || !order?.id) {
     return NextResponse.json({ error: "Invalid email request" }, { status: 400 });
+  }
+
+  let decodedToken;
+  try {
+    decodedToken = await requireFirebaseUser(request);
+  } catch {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  }
+
+  if (action === "created" && order.userId !== decodedToken.uid) {
+    return NextResponse.json({ error: "Order does not belong to this user" }, { status: 403 });
+  }
+
+  if ((action === "approved" || action === "rejected") && !isDecodedAdmin(decodedToken)) {
+    return NextResponse.json({ error: "Admin access required" }, { status: 403 });
   }
 
   const to = config.toAdmin ? adminEmail : order.email;
