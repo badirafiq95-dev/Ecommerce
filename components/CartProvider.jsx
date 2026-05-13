@@ -8,6 +8,7 @@ import {
   findCouponByCode,
   readCoupons
 } from "../lib/coupons";
+import { getAppCheckHeaders } from "../lib/firebaseClient";
 
 const CartContext = createContext(null);
 const STORAGE_KEY = "mint-lane-cart";
@@ -149,10 +150,12 @@ export function CartProvider({ children }) {
     const normalizedCode = String(code || "").trim().toUpperCase();
 
     try {
+      const appCheckHeaders = await getAppCheckHeaders();
       const response = await fetch("/api/coupons/validate", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          ...appCheckHeaders
         },
         body: JSON.stringify({ code: normalizedCode, subtotal, shippingCharge })
       });

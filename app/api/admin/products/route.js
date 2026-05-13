@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
+import { secureApiRequest } from "../../../../lib/apiSecurity";
 import { FieldValue, getAdminDb } from "../../../../lib/firebaseAdmin";
 import { authErrorResponse, requireAdmin } from "../../../../lib/serverAuth";
 import { normalizeProduct, normalizeProducts } from "../../../../lib/productCatalogData";
 
 export async function GET(request) {
   try {
+    await secureApiRequest(request, {
+      route: "admin.products",
+      rateLimit: { scope: "admin.products", limit: 120, windowMs: 60_000 }
+    });
     await requireAdmin(request);
     const snapshot = await getAdminDb().collection("products").orderBy("name").get();
     const products = snapshot.docs.map((productDoc) => ({ id: productDoc.id, ...productDoc.data() }));
@@ -16,6 +21,10 @@ export async function GET(request) {
 
 export async function PUT(request) {
   try {
+    await secureApiRequest(request, {
+      route: "admin.products.update",
+      rateLimit: { scope: "admin.products.update", limit: 60, windowMs: 60_000 }
+    });
     await requireAdmin(request);
     const body = await request.json().catch(() => ({}));
     const products = normalizeProducts(body.products);
@@ -50,6 +59,10 @@ export async function PUT(request) {
 
 export async function POST(request) {
   try {
+    await secureApiRequest(request, {
+      route: "admin.products.create",
+      rateLimit: { scope: "admin.products.create", limit: 30, windowMs: 60_000 }
+    });
     await requireAdmin(request);
     const body = await request.json().catch(() => ({}));
     const product = normalizeProduct({ id: `product-${Date.now()}`, ...body.product });

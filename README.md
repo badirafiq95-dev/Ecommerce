@@ -1,6 +1,6 @@
-# Mint Lane Cards
+# Freaking Collectibles
 
-A lightweight ecommerce-style trading card storefront built with Next.js, local JSON products, and a localStorage cart.
+A premium ecommerce-style trading card storefront built with Next.js, Firebase Authentication, Firestore, and admin-managed catalog data.
 
 ## Run locally
 
@@ -20,7 +20,7 @@ npm run start
 
 ## Update products
 
-Edit `data/products.json`.
+Use the admin panel for product updates in production. The local `data/products.json` file is used as fallback demo data.
 
 Each product supports:
 
@@ -38,8 +38,6 @@ Each product supports:
 
 Place new images in `public/images`, then update the `image` path.
 
-## Notes
+## Firebase project
 
-- Cart data is stored in the shopper's browser localStorage.
-- Checkout is manual and shows a fake success message, with no backend or payment gateway.
-- Product images use Next image optimization and lazy loading.
+Production uses Firebase project `ecommerce-web-7fc55`. Keep the public Firebase config and Firebase Admin credentials pointed at that same project.

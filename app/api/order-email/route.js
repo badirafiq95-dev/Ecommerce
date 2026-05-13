@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import tls from "node:tls";
+import { secureApiRequest } from "../../../lib/apiSecurity";
 import { formatPrice } from "../../../lib/format";
-import { isDecodedAdmin, requireFirebaseUser } from "../../../lib/serverAuth";
+import { authErrorResponse, isDecodedAdmin, requireFirebaseUser } from "../../../lib/serverAuth";
 
 const ACTION_CONFIG = {
   created: {
@@ -302,6 +303,15 @@ async function sendGmailSmtpEmail({ user, appPassword, from, to, subject, html, 
 }
 
 export async function POST(request) {
+  try {
+    await secureApiRequest(request, {
+      route: "order.email",
+      rateLimit: { scope: "order.email", limit: 10, windowMs: 60_000 }
+    });
+  } catch (error) {
+    return authErrorResponse(error);
+  }
+
   const apiKey = process.env.RESEND_API_KEY;
   const smtpUser = process.env.SMTP_USER;
   const smtpAppPassword = process.env.SMTP_APP_PASSWORD;
