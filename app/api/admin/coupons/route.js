@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { secureApiRequest } from "../../../../lib/apiSecurity";
 import { FieldValue, getAdminDb } from "../../../../lib/firebaseAdmin";
 import { normalizeCouponCode } from "../../../../lib/coupons";
 import { authErrorResponse, requireAdmin } from "../../../../lib/serverAuth";
@@ -21,6 +22,10 @@ async function readCouponsFromDb() {
 
 export async function GET(request) {
   try {
+    await secureApiRequest(request, {
+      route: "admin.coupons",
+      rateLimit: { scope: "admin.coupons", limit: 120, windowMs: 60_000 }
+    });
     await requireAdmin(request);
     return NextResponse.json({ coupons: await readCouponsFromDb() });
   } catch (error) {
@@ -30,6 +35,10 @@ export async function GET(request) {
 
 export async function PUT(request) {
   try {
+    await secureApiRequest(request, {
+      route: "admin.coupons.update",
+      rateLimit: { scope: "admin.coupons.update", limit: 60, windowMs: 60_000 }
+    });
     await requireAdmin(request);
     const body = await request.json().catch(() => ({}));
     const coupons = Array.isArray(body.coupons) ? body.coupons.map(normalizeCoupon).filter((coupon) => coupon.code) : [];
@@ -58,6 +67,10 @@ export async function PUT(request) {
 
 export async function POST(request) {
   try {
+    await secureApiRequest(request, {
+      route: "admin.coupons.create",
+      rateLimit: { scope: "admin.coupons.create", limit: 30, windowMs: 60_000 }
+    });
     await requireAdmin(request);
     const body = await request.json().catch(() => ({}));
     const coupon = normalizeCoupon(body.coupon);

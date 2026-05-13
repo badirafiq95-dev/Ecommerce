@@ -1,0 +1,37 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.admin == true;
+    }
+
+    function isImageUnderFiveMb() {
+      return request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    match /payment-screenshots/{userId}/{orderId}/{fileName} {
+      allow read: if isAdmin() || isOwner(userId);
+      allow write: if isOwner(userId) && isImageUnderFiveMb();
+      allow delete: if isAdmin() || isOwner(userId);
+    }
+
+    match /product-images/{fileName} {
+      allow read: if true;
+      allow write, delete: if isAdmin() && isImageUnderFiveMb();
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

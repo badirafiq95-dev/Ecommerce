@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { secureApiRequest } from "../../../../../lib/apiSecurity";
 import { FieldValue, getAdminDb } from "../../../../../lib/firebaseAdmin";
 import { authErrorResponse, requireAdmin } from "../../../../../lib/serverAuth";
 
@@ -6,6 +7,10 @@ const ALLOWED_STATUSES = new Set(["Payment review", "Approved", "Rejected", "Can
 
 export async function PATCH(request, context) {
   try {
+    await secureApiRequest(request, {
+      route: "admin.orders.update",
+      rateLimit: { scope: "admin.orders.update", limit: 60, windowMs: 60_000 }
+    });
     await requireAdmin(request);
     const { orderId } = await context.params;
     const body = await request.json().catch(() => ({}));

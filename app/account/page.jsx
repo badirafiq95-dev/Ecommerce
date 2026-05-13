@@ -9,10 +9,12 @@ import { Header } from "../../components/Header";
 import { useCustomerAuth } from "../../components/CustomerAuthProvider";
 import {
   auth,
+  getAppCheckHeaders,
   listenCustomerOrders,
   listenCustomerProfile,
   loginWithGoogle,
   logoutCustomer,
+  prepareGoogleLogin,
   upsertCustomerProfile
 } from "../../lib/firebaseClient";
 import { formatPrice } from "../../lib/format";
@@ -155,27 +157,91 @@ function authErrorMessage(error) {
     return `Firebase login blocked hai kyunki "${currentDomain}" "${firebaseProject}" project ke Authorized domains me add nahi hai. Firebase Console me same project open karke Authentication > Settings > Authorized domains me is domain ko add karo, phir refresh karke login try karo.`;
   }
   if (error?.code === "auth/popup-closed-by-user") {
-    return "Google login was closed before it finished.";
+    return "Login cancelled";
+  }
+  if (error?.code === "auth/popup-blocked") {
+    return "Google login popup was blocked. Please allow popups for this website and try again.";
   }
   if (error?.code === "auth/operation-not-allowed") {
     return "Google login is not enabled in Firebase.";
   }
-  return error?.message || "Login failed. Please try again.";
+  if (error?.code === "auth/network-request-failed") {
+    return "Authentication failed. Please check your connection.";
+  }
+  if (error?.code === "auth/popup-timeout") {
+    return "Authentication timed out. Please try again.";
+  }
+  if (error?.code?.startsWith("auth/")) {
+    return "Authentication failed. Please try again.";
+  }
+  return error?.message || "Authentication failed. Please try again.";
 }
 
 function AuthPanel() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const authAttemptRef = useRef(0);
+  const focusTimerRef = useRef(null);
+  const armFocusWatchRef = useRef(null);
+
+  useEffect(() => {
+    prepareGoogleLogin();
+    return () => {
+      if (focusTimerRef.current) window.clearTimeout(focusTimerRef.current);
+      if (armFocusWatchRef.current) window.clearTimeout(armFocusWatchRef.current);
+    };
+  }, []);
 
   const handleGoogleAuth = async () => {
+    const attemptId = authAttemptRef.current + 1;
+    authAttemptRef.current = attemptId;
+    let focusWatchArmed = false;
+
+    const clearAuthTimers = () => {
+      if (focusTimerRef.current) {
+        window.clearTimeout(focusTimerRef.current);
+        focusTimerRef.current = null;
+      }
+      if (armFocusWatchRef.current) {
+        window.clearTimeout(armFocusWatchRef.current);
+        armFocusWatchRef.current = null;
+      }
+    };
+
+    const handlePossiblePopupReturn = () => {
+      if (!focusWatchArmed || authAttemptRef.current !== attemptId) return;
+      if (focusTimerRef.current) window.clearTimeout(focusTimerRef.current);
+      focusTimerRef.current = window.setTimeout(() => {
+        if (authAttemptRef.current !== attemptId) return;
+        authAttemptRef.current += 1;
+        setLoading(false);
+        setError("Login cancelled");
+      }, 700);
+    };
+
+    clearAuthTimers();
     setError("");
     setLoading(true);
+    window.addEventListener("focus", handlePossiblePopupReturn);
+    document.addEventListener("visibilitychange", handlePossiblePopupReturn);
+    armFocusWatchRef.current = window.setTimeout(() => {
+      focusWatchArmed = true;
+    }, 500);
+
     try {
       await loginWithGoogle();
+      if (authAttemptRef.current !== attemptId) return;
+      setError("");
     } catch (error) {
+      if (authAttemptRef.current !== attemptId) return;
       setError(authErrorMessage(error));
     } finally {
-      setLoading(false);
+      window.removeEventListener("focus", handlePossiblePopupReturn);
+      document.removeEventListener("visibilitychange", handlePossiblePopupReturn);
+      clearAuthTimers();
+      if (authAttemptRef.current === attemptId) {
+        setLoading(false);
+      }
     }
   };
 
@@ -190,7 +256,13 @@ function AuthPanel() {
         <p>Track orders, save payment details, edit your profile, and request cancellation from one secure dashboard.</p>
 
         <div className="auth-choice-grid google-only-auth">
-          <button type="button" onClick={handleGoogleAuth} disabled={loading}>
+          <button
+            type="button"
+            onClick={handleGoogleAuth}
+            onFocus={prepareGoogleLogin}
+            onPointerEnter={prepareGoogleLogin}
+            disabled={loading}
+          >
             <svg className="google-mark" viewBox="0 0 24 24" aria-hidden="true">
               <path fill="#4285F4" d="M21.6 12.23c0-.78-.07-1.53-.2-2.23H12v4.22h5.38a4.6 4.6 0 0 1-2 3.02v2.52h3.24c1.9-1.75 2.98-4.33 2.98-7.53Z" />
               <path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.62-2.44l-3.24-2.52c-.9.6-2.04.96-3.38.96-2.6 0-4.8-1.76-5.59-4.12H3.06v2.6A10 10 0 0 0 12 22Z" />
@@ -244,10 +316,12 @@ function CustomerDashboard({ user }) {
   const requestCancel = async (order) => {
     if (!cancelReason.trim()) return;
     const token = await auth.currentUser?.getIdToken();
+    const appCheckHeaders = await getAppCheckHeaders();
     await fetch(`/api/orders/${order.id}/cancel`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
+        ...appCheckHeaders,
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       },
       body: JSON.stringify({ cancelReason: cancelReason.trim() })

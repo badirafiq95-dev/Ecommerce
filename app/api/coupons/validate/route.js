@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { secureApiRequest } from "../../../../lib/apiSecurity";
 import { getAdminDb } from "../../../../lib/firebaseAdmin";
 import { calculateCouponDiscount, normalizeCouponCode } from "../../../../lib/coupons";
+import { authErrorResponse } from "../../../../lib/serverAuth";
 
 async function readServerCoupons() {
   try {
@@ -13,6 +15,15 @@ async function readServerCoupons() {
 }
 
 export async function POST(request) {
+  try {
+    await secureApiRequest(request, {
+      route: "coupons.validate",
+      rateLimit: { scope: "coupons.validate", limit: 30, windowMs: 60_000 }
+    });
+  } catch (error) {
+    return authErrorResponse(error);
+  }
+
   const body = await request.json().catch(() => ({}));
   const code = normalizeCouponCode(body.code);
   const subtotal = Number(body.subtotal || 0);

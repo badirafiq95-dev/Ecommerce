@@ -1,9 +1,10 @@
 {
-  "name": "trading-card-shop",
+  "name": "freaking-collectibles",
   "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/check-firebase-project.mjs",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "next lint"

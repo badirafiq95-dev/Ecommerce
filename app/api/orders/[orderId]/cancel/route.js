@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
+import { secureApiRequest } from "../../../../../lib/apiSecurity";
 import { FieldValue, getAdminDb } from "../../../../../lib/firebaseAdmin";
 import { authErrorResponse, requireFirebaseUser } from "../../../../../lib/serverAuth";
 
 export async function PATCH(request, context) {
   try {
+    await secureApiRequest(request, {
+      route: "orders.cancel",
+      rateLimit: { scope: "orders.cancel", limit: 8, windowMs: 60_000 }
+    });
     const decodedToken = await requireFirebaseUser(request);
     const { orderId } = await context.params;
     const body = await request.json().catch(() => ({}));
