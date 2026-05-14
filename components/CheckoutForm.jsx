@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, CheckCircle2, LockKeyhole, MapPin, ShieldCheck, Truck, UploadCloud } from "lucide-react";
+import { ArrowRight, CheckCircle2, LockKeyhole, ShieldCheck, Truck, UploadCloud } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useCart } from "./CartProvider";
 import { useProductCatalog } from "./useProductCatalog";
@@ -99,96 +99,40 @@ function normalizePincode(value) {
   return String(value || "").replace(/\D/g, "").slice(0, 6);
 }
 
+function normalizeAddressPhone(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  const localDigits = digits.length > 10 && digits.startsWith("91") ? digits.slice(2) : digits;
+  return localDigits.slice(0, 10);
+}
+
 function matchIndianState(value) {
-  const normalizedValue = String(value || "").toLowerCase().replace(/&/g, "and").replace(/\s+/g, " ").trim();
-  return INDIA_STATES.find((state) => state.toLowerCase().replace(/&/g, "and").replace(/\s+/g, " ").trim() === normalizedValue) || "";
+  const normalizedValue = String(value || "").trim().toLowerCase();
+  if (!normalizedValue) return "";
+  return INDIA_STATES.find((state) => state.toLowerCase() === normalizedValue) || "";
 }
 
 async function lookupPincodeDetails(pincode, signal) {
-  const normalizedPincode = normalizePincode(pincode);
-  if (normalizedPincode.length !== 6) return null;
+  const code = normalizePincode(pincode);
+  if (code.length !== 6) return null;
 
-  const response = await fetch(`https://api.postalpincode.in/pincode/${normalizedPincode}`, { signal });
-  if (!response.ok) throw new Error("Pincode lookup failed");
+  const response = await fetch(`https://api.postalpincode.in/pincode/${code}`, {
+    cache: "no-store",
+    signal
+  });
+  if (!response.ok) return null;
 
-  const [result] = await response.json();
-  const postOffice = result?.PostOffice?.[0];
-  if (result?.Status !== "Success" || !postOffice) return null;
+  const payload = await response.json();
+  const result = Array.isArray(payload) ? payload[0] : null;
+  const postOffices = Array.isArray(result?.PostOffice) ? result.PostOffice : [];
+  const office = postOffices.find((item) => item?.DeliveryStatus === "Delivery") || postOffices[0];
+  if (!office || result?.Status !== "Success") return null;
 
   return {
-    pincode: normalizedPincode,
-    locality: postOffice.Name || postOffice.Block || "",
-    city: postOffice.District || postOffice.Division || "",
-    state: matchIndianState(postOffice.State) || postOffice.State || ""
+    pincode: code,
+    locality: office.Name || office.Block || office.Division || "",
+    city: office.District || office.Block || office.Division || "",
+    state: matchIndianState(office.State) || office.State || ""
   };
-}
-
-function getCurrentPosition() {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error("Location permission is not supported on this browser."));
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(resolve, reject, {
-      enableHighAccuracy: true,
-      maximumAge: 30000,
-      timeout: 12000
-    });
-  });
-}
-
-async function reverseWithNominatim(latitude, longitude) {
-  const params = new URLSearchParams({
-    format: "jsonv2",
-    lat: String(latitude),
-    lon: String(longitude),
-    addressdetails: "1",
-    zoom: "18"
-  });
-  const response = await fetch(`https://nominatim.openstreetmap.org/reverse?${params}`);
-  if (!response.ok) throw new Error("Location lookup failed");
-
-  const data = await response.json();
-  const address = data.address || {};
-  const locality = address.suburb || address.neighbourhood || address.village || address.city_district || address.hamlet || "";
-  const city = address.city || address.town || address.village || address.county || address.state_district || "";
-  const lineParts = [address.house_number, address.road, address.residential || address.quarter || ""].filter(Boolean);
-
-  return {
-    pincode: normalizePincode(address.postcode),
-    locality,
-    city,
-    state: matchIndianState(address.state) || address.state || "",
-    line1: lineParts.join(", ")
-  };
-}
-
-async function reverseWithBigDataCloud(latitude, longitude) {
-  const params = new URLSearchParams({
-    latitude: String(latitude),
-    longitude: String(longitude),
-    localityLanguage: "en"
-  });
-  const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?${params}`);
-  if (!response.ok) throw new Error("Location lookup failed");
-
-  const data = await response.json();
-  return {
-    pincode: normalizePincode(data.postcode || data.postalCode),
-    locality: data.locality || data.city || "",
-    city: data.city || data.locality || "",
-    state: matchIndianState(data.principalSubdivision) || data.principalSubdivision || "",
-    line1: ""
-  };
-}
-
-async function reverseGeocodeCoordinates(latitude, longitude) {
-  try {
-    return await reverseWithNominatim(latitude, longitude);
-  } catch {
-    return reverseWithBigDataCloud(latitude, longitude);
-  }
 }
 
 function readPaymentScreenshot(file) {
@@ -228,10 +172,11 @@ export function CheckoutForm() {
   const [orderId, setOrderId] = useState("");
   const [startedAt] = useState(Date.now());
   const [error, setError] = useState("");
-  const [addressAssist, setAddressAssist] = useState({ tone: "", message: "" });
-  const [isLocating, setIsLocating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [paymentFileName, setPaymentFileName] = useState("");
+  const [isStateMenuOpen, setIsStateMenuOpen] = useState(false);
+  const [isStateMenuPinned, setIsStateMenuPinned] = useState(false);
+  const stateCloseTimerRef = useRef(null);
   const paymentSubmitLockedRef = useRef(false);
 
   useEffect(() => {
@@ -277,14 +222,14 @@ export function CheckoutForm() {
     setAddressForm((current) => ({
       ...current,
       name: current.name || savedAddress?.name || profile.name || user.displayName || "",
-      phone: current.phone || savedAddress?.phone || profile.phone || "",
+      phone: current.phone || normalizeAddressPhone(savedAddress?.phone || profile.phone || ""),
       line1: current.line1 || savedAddress?.line1 || savedAddressLine || "",
       city: current.city || savedAddress?.city || "",
       state: current.state || savedAddress?.state || "",
-      pincode: current.pincode || savedAddress?.pincode || "",
+      pincode: current.pincode || normalizePincode(savedAddress?.pincode || ""),
       locality: current.locality || savedAddress?.locality || "",
       landmark: current.landmark || savedAddress?.landmark || "",
-      alternatePhone: current.alternatePhone || savedAddress?.alternatePhone || "",
+      alternatePhone: current.alternatePhone || normalizeAddressPhone(savedAddress?.alternatePhone || ""),
       label: current.label || savedAddress?.label || "Home"
     }));
     if (savedAddressLine) {
@@ -301,79 +246,48 @@ export function CheckoutForm() {
   }, [submitted]);
 
   useEffect(() => {
+    return () => {
+      if (stateCloseTimerRef.current) window.clearTimeout(stateCloseTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
     const pincode = normalizePincode(addressForm.pincode);
-    if (pincode.length !== 6) return undefined;
+    if (pincode.length !== 6 || isAddressSaved) return undefined;
 
     const controller = new AbortController();
-    setAddressAssist({ tone: "loading", message: "Finding address details..." });
-
     lookupPincodeDetails(pincode, controller.signal)
       .then((details) => {
-        if (!details) {
-          setAddressAssist({ tone: "error", message: "Pincode details not found." });
-          return;
-        }
-
+        if (!details) return;
         setAddressForm((current) => {
           if (normalizePincode(current.pincode) !== pincode) return current;
           return {
             ...current,
-            pincode,
-            locality: details.locality || current.locality,
+            locality: current.locality || details.locality,
             city: details.city || current.city,
             state: details.state || current.state
           };
         });
-        setAddressAssist({ tone: "success", message: "City and state filled from pincode." });
       })
       .catch((lookupError) => {
-        if (lookupError?.name === "AbortError") return;
-        setAddressAssist({ tone: "error", message: "Could not fetch pincode details." });
+        if (lookupError?.name !== "AbortError" && process.env.NODE_ENV !== "production") {
+          console.warn("Pincode lookup failed.", lookupError);
+        }
       });
 
     return () => controller.abort();
-  }, [addressForm.pincode]);
+  }, [addressForm.pincode, isAddressSaved]);
 
   const updateAddressField = (field, value) => {
-    const nextValue = field === "pincode" ? normalizePincode(value) : value;
+    const nextValue =
+      field === "pincode"
+        ? normalizePincode(value)
+        : field === "phone" || field === "alternatePhone"
+          ? normalizeAddressPhone(value)
+          : value;
     setAddressForm((current) => ({ ...current, [field]: nextValue }));
-    if (field === "pincode" && normalizePincode(value).length < 6) {
-      setAddressAssist({ tone: "", message: "" });
-    }
     setIsAddressSaved(false);
     setCheckoutStage("address");
-  };
-
-  const handleUseCurrentLocation = async () => {
-    if (isLocating) return;
-    setError("");
-    setIsLocating(true);
-    setAddressAssist({ tone: "loading", message: "Detecting your current location..." });
-
-    try {
-      const position = await getCurrentPosition();
-      const coordinates = position.coords;
-      const locationDetails = await reverseGeocodeCoordinates(coordinates.latitude, coordinates.longitude);
-      const pincodeDetails = locationDetails.pincode
-        ? await lookupPincodeDetails(locationDetails.pincode).catch(() => null)
-        : null;
-
-      setAddressForm((current) => ({
-        ...current,
-        pincode: pincodeDetails?.pincode || locationDetails.pincode || current.pincode,
-        locality: locationDetails.locality || pincodeDetails?.locality || current.locality,
-        city: pincodeDetails?.city || locationDetails.city || current.city,
-        state: pincodeDetails?.state || locationDetails.state || current.state,
-        line1: locationDetails.line1 || current.line1
-      }));
-      setIsAddressSaved(false);
-      setCheckoutStage("address");
-      setAddressAssist({ tone: "success", message: "Current location details filled. Add landmark manually if needed." });
-    } catch (locationError) {
-      setAddressAssist({ tone: "error", message: locationError?.message || "Could not detect current location." });
-    } finally {
-      setIsLocating(false);
-    }
   };
 
   const openPaymentStage = () => {
@@ -390,6 +304,10 @@ export function CheckoutForm() {
     event.preventDefault();
     if (!user || isSavingAddress) return;
     setError("");
+    if (!addressForm.state) {
+      setError("Select state.");
+      return;
+    }
     setIsSavingAddress(true);
     const addressLine = buildAddressLine(addressForm);
 
@@ -769,33 +687,75 @@ export function CheckoutForm() {
               </button>
             </div>
           ) : (
-          <form className="flip-address-form" onSubmit={handleAddressSave}>
+          <form className="flip-address-form checkout-address-entry-form" onSubmit={handleAddressSave}>
             <label className="flip-radio-row">
               <input type="radio" checked readOnly />
               Add a new address
             </label>
-            <button className="flip-location-button" type="button" onClick={handleUseCurrentLocation} disabled={isLocating}>
-              <MapPin size={18} />
-              {isLocating ? "Detecting location..." : "Use my current location"}
-            </button>
-            {addressAssist.message ? (
-              <p className={`address-autofill-status ${addressAssist.tone ? `is-${addressAssist.tone}` : ""}`} role="status">
-                {addressAssist.message}
-              </p>
-            ) : null}
             <div className="flip-address-grid">
               <input value={addressForm.name} onChange={(event) => updateAddressField("name", event.target.value)} placeholder="Name" required />
-              <input value={addressForm.phone} onChange={(event) => updateAddressField("phone", event.target.value)} placeholder="10-digit mobile number" required inputMode="tel" />
+              <input value={addressForm.phone} onChange={(event) => updateAddressField("phone", event.target.value)} placeholder="10-digit mobile number" required inputMode="numeric" maxLength={10} />
               <input value={addressForm.pincode} onChange={(event) => updateAddressField("pincode", event.target.value)} placeholder="Pincode" required inputMode="numeric" maxLength={6} />
               <input value={addressForm.locality} onChange={(event) => updateAddressField("locality", event.target.value)} placeholder="Locality" required />
               <textarea value={addressForm.line1} onChange={(event) => updateAddressField("line1", event.target.value)} placeholder="Address (Area and Street)" required />
               <input value={addressForm.city} onChange={(event) => updateAddressField("city", event.target.value)} placeholder="City/District/Town" required />
-              <select value={addressForm.state} onChange={(event) => updateAddressField("state", event.target.value)} required>
-                <option value="">--Select State--</option>
-                {INDIA_STATES.map((state) => <option key={state} value={state}>{state}</option>)}
-              </select>
+              <div
+                className={`premium-state-select checkout-state-select ${isStateMenuOpen ? "is-open" : ""}`}
+                onMouseEnter={() => {
+                  if (stateCloseTimerRef.current) window.clearTimeout(stateCloseTimerRef.current);
+                  if (!isStateMenuPinned && !addressForm.state) setIsStateMenuOpen(true);
+                }}
+                onMouseLeave={() => {
+                  if (!isStateMenuPinned) {
+                    stateCloseTimerRef.current = window.setTimeout(() => setIsStateMenuOpen(false), 120);
+                  }
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsStateMenuPinned((value) => {
+                      const nextValue = !value;
+                      setIsStateMenuOpen(nextValue);
+                      return nextValue;
+                    });
+                  }}
+                >
+                  {addressForm.state || "--Select State--"}
+                  <span />
+                </button>
+                {isStateMenuOpen ? (
+                  <div className="premium-state-menu">
+                    <button
+                      className={!addressForm.state ? "is-selected" : ""}
+                      type="button"
+                      onClick={() => {
+                        updateAddressField("state", "");
+                        setIsStateMenuOpen(false);
+                        setIsStateMenuPinned(false);
+                      }}
+                    >
+                      --Select State--
+                    </button>
+                    {INDIA_STATES.map((state) => (
+                      <button
+                        className={addressForm.state === state ? "is-selected" : ""}
+                        type="button"
+                        key={state}
+                        onClick={() => {
+                          updateAddressField("state", state);
+                          setIsStateMenuOpen(false);
+                          setIsStateMenuPinned(false);
+                        }}
+                      >
+                        {state}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
               <input value={addressForm.landmark} onChange={(event) => updateAddressField("landmark", event.target.value)} placeholder="Landmark (Optional)" />
-              <input value={addressForm.alternatePhone} onChange={(event) => updateAddressField("alternatePhone", event.target.value)} placeholder="Alternate Phone (Optional)" inputMode="tel" />
+              <input value={addressForm.alternatePhone} onChange={(event) => updateAddressField("alternatePhone", event.target.value)} placeholder="Alternate Phone (Optional)" inputMode="numeric" maxLength={10} />
             </div>
             <fieldset className="flip-address-type">
               <legend>Address Type</legend>

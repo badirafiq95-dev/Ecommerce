@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, LogOut, UserRound, XCircle } from "lucide-react";
@@ -123,26 +123,53 @@ function normalizeAddressPhone(value) {
 }
 
 function matchIndianState(value) {
-  const normalizedValue = String(value || "").toLowerCase().replace(/&/g, "and").replace(/\s+/g, " ").trim();
-  return INDIA_STATES.find((state) => state.toLowerCase().replace(/&/g, "and").replace(/\s+/g, " ").trim() === normalizedValue) || "";
+  const normalizedValue = String(value || "").trim().toLowerCase();
+  if (!normalizedValue) return "";
+  return INDIA_STATES.find((state) => state.toLowerCase() === normalizedValue) || "";
+}
+
+function getAddressStreetLine(address) {
+  const savedStreet = String(address?.line1 || "").trim();
+  if (savedStreet) return savedStreet;
+
+  const fullLine = String(address?.line || "").trim();
+  if (!fullLine) return "";
+
+  const knownParts = new Set(
+    [address?.locality, address?.city, address?.state, address?.pincode]
+      .filter(Boolean)
+      .map((part) => String(part).trim().toLowerCase())
+  );
+  const lineParts = fullLine.split(",").map((part) => part.trim()).filter(Boolean);
+
+  while (lineParts.length > 1 && knownParts.has(lineParts[lineParts.length - 1].toLowerCase())) {
+    lineParts.pop();
+  }
+
+  return lineParts.join(", ") || fullLine;
 }
 
 async function lookupPincodeDetails(pincode, signal) {
-  const normalizedPincode = normalizePincode(pincode);
-  if (normalizedPincode.length !== 6) return null;
+  const code = normalizePincode(pincode);
+  if (code.length !== 6) return null;
 
-  const response = await fetch(`https://api.postalpincode.in/pincode/${normalizedPincode}`, { signal });
-  if (!response.ok) throw new Error("Pincode lookup failed");
+  const response = await fetch(`https://api.postalpincode.in/pincode/${code}`, {
+    cache: "no-store",
+    signal
+  });
+  if (!response.ok) return null;
 
-  const [result] = await response.json();
-  const postOffice = result?.PostOffice?.[0];
-  if (result?.Status !== "Success" || !postOffice) return null;
+  const payload = await response.json();
+  const result = Array.isArray(payload) ? payload[0] : null;
+  const postOffices = Array.isArray(result?.PostOffice) ? result.PostOffice : [];
+  const office = postOffices.find((item) => item?.DeliveryStatus === "Delivery") || postOffices[0];
+  if (!office || result?.Status !== "Success") return null;
 
   return {
-    pincode: normalizedPincode,
-    locality: postOffice.Name || postOffice.Block || "",
-    city: postOffice.District || postOffice.Division || "",
-    state: matchIndianState(postOffice.State) || postOffice.State || ""
+    pincode: code,
+    locality: office.Name || office.Block || office.Division || "",
+    city: office.District || office.Block || office.Division || "",
+    state: matchIndianState(office.State) || office.State || ""
   };
 }
 
@@ -457,10 +484,10 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
   const [isSavingAddress, setIsSavingAddress] = useState(false);
   const stateCloseTimerRef = useRef(null);
   const profileNoticeTimerRef = useRef(null);
+  const profilePanelRef = useRef(null);
   const [notice, setNotice] = useState("");
   const [noticeToken, setNoticeToken] = useState(0);
   const [addressNotice, setAddressNotice] = useState("");
-  const [addressAssist, setAddressAssist] = useState({ tone: "", message: "" });
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const baseName = profile?.name || user.displayName || user.email?.split("@")[0] || "";
   const { firstName, lastName } = splitProfileName(baseName);
@@ -491,43 +518,6 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
       if (profileNoticeTimerRef.current) window.clearTimeout(profileNoticeTimerRef.current);
     };
   }, []);
-
-  useEffect(() => {
-    if (!isAddressFormOpen) return undefined;
-    const pincode = normalizePincode(addressForm.pincode);
-    if (pincode.length !== 6) {
-      setAddressAssist({ tone: "", message: "" });
-      return undefined;
-    }
-
-    const controller = new AbortController();
-    setAddressAssist({ tone: "loading", message: "Finding address details..." });
-    lookupPincodeDetails(pincode, controller.signal)
-      .then((details) => {
-        if (!details) {
-          setAddressAssist({ tone: "error", message: "Pincode details not found." });
-          return;
-        }
-
-        setAddressForm((current) => {
-          if (normalizePincode(current.pincode) !== pincode) return current;
-          return {
-            ...current,
-            pincode,
-            locality: details.locality || current.locality,
-            city: details.city || current.city,
-            state: details.state || current.state
-          };
-        });
-        setAddressAssist({ tone: "success", message: "City and state filled from pincode." });
-      })
-      .catch((error) => {
-        if (error?.name === "AbortError") return;
-        setAddressAssist({ tone: "error", message: "Could not fetch pincode details." });
-      });
-
-    return () => controller.abort();
-  }, [addressForm.pincode, isAddressFormOpen]);
 
   useEffect(() => {
     if (profile) return;
@@ -572,12 +562,67 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
     setAddressDrafts(profile.address ? [{ label: "Home", line: profile.address, name: baseName, phone: profile.phone || "" }] : []);
   }, [profile]);
 
+  useEffect(() => {
+    if (!isAddressFormOpen) return undefined;
+    const pincode = normalizePincode(addressForm.pincode);
+    if (pincode.length !== 6) return undefined;
+
+    const controller = new AbortController();
+    lookupPincodeDetails(pincode, controller.signal)
+      .then((details) => {
+        if (!details) return;
+        setAddressForm((current) => {
+          if (normalizePincode(current.pincode) !== pincode) return current;
+          return {
+            ...current,
+            locality: current.locality || details.locality,
+            city: details.city || current.city,
+            state: details.state || current.state
+          };
+        });
+      })
+      .catch((error) => {
+        if (error?.name !== "AbortError" && process.env.NODE_ENV !== "production") {
+          console.warn("Pincode lookup failed.", error);
+        }
+      });
+
+    return () => controller.abort();
+  }, [addressForm.pincode, isAddressFormOpen]);
+
   const updateProfileDraft = (field, value) => {
     setProfileDraft((current) => ({ ...current, [field]: value }));
   };
 
+  const savedProfileSnapshot = useMemo(() => {
+    const savedName = splitProfileName(profile?.name || user.displayName || user.email?.split("@")[0] || "");
+    return {
+      firstName: savedName.firstName.trim(),
+      lastName: savedName.lastName.trim(),
+      gender: profile?.gender || "",
+      phone: getSavableIndianMobile(profile?.phone || ""),
+      address: String(profile?.address || "").trim()
+    };
+  }, [profile, user.displayName, user.email]);
+
+  const currentProfileSnapshot = useMemo(
+    () => ({
+      firstName: profileDraft.firstName.trim(),
+      lastName: profileDraft.lastName.trim(),
+      gender: profileDraft.gender || "",
+      phone: getSavableIndianMobile(profileDraft.phone),
+      address: profileDraft.address.trim()
+    }),
+    [profileDraft]
+  );
+
+  const hasProfileChanges = Object.keys(savedProfileSnapshot).some(
+    (key) => savedProfileSnapshot[key] !== currentProfileSnapshot[key]
+  );
+
   const handleProfileSave = async (event) => {
     event.preventDefault();
+    if (!hasProfileChanges) return;
     const nextFirstName = profileDraft.firstName.trim();
     const nextLastName = profileDraft.lastName.trim();
     const normalizedPhone = getSavableIndianMobile(profileDraft.phone);
@@ -599,6 +644,9 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
     if (profileNoticeTimerRef.current) window.clearTimeout(profileNoticeTimerRef.current);
     setNotice("Changes saved");
     setNoticeToken(Date.now());
+    window.requestAnimationFrame(() => {
+      profilePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
     profileNoticeTimerRef.current = window.setTimeout(() => {
       setNotice("");
       profileNoticeTimerRef.current = null;
@@ -637,7 +685,6 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
       alternatePhone: "",
       label: "Home"
     });
-    setAddressAssist({ tone: "", message: "" });
   };
 
   const addAddressDraft = () => {
@@ -651,34 +698,43 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
 
   const editAddressDraft = (index) => {
     const address = addressDrafts[index];
+    if (!address) return;
     setEditingAddressIndex(index);
     setAddressForm({
       name: address.name || baseName || "",
       phone: normalizeAddressPhone(address.phone || profile?.phone || ""),
       pincode: address.pincode || "",
       locality: address.locality || "",
-      line: address.line || "",
+      line: getAddressStreetLine(address),
       city: address.city || "",
       state: address.state || "",
       landmark: address.landmark || "",
       alternatePhone: normalizeAddressPhone(address.alternatePhone || ""),
       label: address.label || "Home"
     });
-    setAddressAssist({ tone: "", message: "" });
     setIsAddressFormOpen(true);
     setIsStateMenuOpen(false);
     setIsStateMenuPinned(false);
     setOpenAddressMenu(null);
   };
 
-  const deleteAddressDraft = (index) => {
+  const deleteAddressDraft = async (index) => {
     const next = addressDrafts.filter((_, currentIndex) => currentIndex !== index);
+    setIsSavingAddress(true);
     setAddressDrafts(next);
     setOpenAddressMenu(null);
-    upsertCustomerProfile(user, {
-      addresses: next,
-      address: next[0]?.line || ""
-    });
+    setIsAddressFormOpen(false);
+    setEditingAddressIndex(null);
+    try {
+      await upsertCustomerProfile(user, {
+        addresses: next,
+        address: next[0]?.line || ""
+      });
+      setAddressNotice("Address deleted");
+      window.setTimeout(() => setAddressNotice(""), 1500);
+    } finally {
+      setIsSavingAddress(false);
+    }
   };
 
   const saveAddressForm = async (event) => {
@@ -693,6 +749,7 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
     const nextAddress = {
       ...normalizedAddressForm,
       label: normalizedAddressForm.label || "Home",
+      line1: normalizedAddressForm.line.trim(),
       line: formatAddressLine(normalizedAddressForm)
     };
     const nextAddresses =
@@ -700,20 +757,22 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
         ? [...addressDrafts, nextAddress]
         : addressDrafts.map((address, index) => (index === editingAddressIndex ? nextAddress : address));
 
-    await upsertCustomerProfile(user, {
-      addresses: nextAddresses,
-      address: nextAddresses[0]?.line || "",
-      phone: profile?.phone || nextAddress.phone
-    });
-    setAddressDrafts(nextAddresses);
-    setAddressNotice("Addresses saved");
-    window.setTimeout(() => {
-      setAddressNotice("");
+    try {
+      await upsertCustomerProfile(user, {
+        addresses: nextAddresses,
+        address: nextAddresses[0]?.line || "",
+        phone: profile?.phone || nextAddress.phone
+      });
+      setAddressDrafts(nextAddresses);
+      setAddressNotice("Addresses saved");
+      window.setTimeout(() => {
+        setAddressNotice("");
+        setIsAddressFormOpen(false);
+        setEditingAddressIndex(null);
+      }, 650);
+    } finally {
       setIsSavingAddress(false);
-      setIsAddressFormOpen(false);
-      setEditingAddressIndex(null);
-      setAddressAssist({ tone: "", message: "" });
-    }, 650);
+    }
   };
 
   const switchProfileSection = (section) => {
@@ -785,7 +844,9 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
     }
 
     if (activeSection === "addresses") {
-      const savedAddresses = addressDrafts.filter((address) => address.line?.trim());
+      const savedAddresses = addressDrafts
+        .map((address, originalIndex) => ({ address, originalIndex }))
+        .filter(({ address }) => address.line?.trim());
       const hasSavedAddress = savedAddresses.length > 0;
 
       return (
@@ -803,12 +864,6 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
           {isAddressFormOpen ? (
             <form className="address-entry-form" onSubmit={saveAddressForm}>
               <p>ADD A NEW ADDRESS</p>
-              <button className="address-location-button" type="button">Use my current location</button>
-              {addressAssist.message ? (
-                <p className={`address-autofill-status ${addressAssist.tone ? `is-${addressAssist.tone}` : ""}`} role="status">
-                  {addressAssist.message}
-                </p>
-              ) : null}
               <div className="address-entry-grid">
                 <input value={addressForm.name} onChange={(event) => setAddressForm((current) => ({ ...current, name: event.target.value }))} placeholder="Name" required />
                 <input
@@ -898,16 +953,27 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
                 <label><input type="radio" checked={addressForm.label === "Work"} onChange={() => setAddressForm((current) => ({ ...current, label: "Work" }))} /> Work</label>
               </div>
               <div className="address-form-actions">
-                <button className="primary-button" type="submit">{isSavingAddress ? "Saving..." : "Save"}</button>
-                <button type="button" onClick={() => setIsAddressFormOpen(false)}>Cancel</button>
+                <button className="primary-button" type="submit" disabled={isSavingAddress}>{isSavingAddress ? "Saving..." : "Save"}</button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAddressFormOpen(false);
+                    setEditingAddressIndex(null);
+                    setIsStateMenuOpen(false);
+                    setIsStateMenuPinned(false);
+                  }}
+                >
+                  Cancel
+                </button>
               </div>
             </form>
           ) : null}
 
-          <div className="address-book-list">
-            {hasSavedAddress ? (
-              savedAddresses.map((address, index) => (
-                  <article className="address-book-row" key={`saved-address-${index}`}>
+          {!isAddressFormOpen ? (
+            <div className="address-book-list">
+              {hasSavedAddress ? (
+                savedAddresses.map(({ address, originalIndex }) => (
+                  <article className="address-book-row" key={`saved-address-${originalIndex}`}>
                     <div>
                       <span className="address-type-pill">{address.label || "HOME"}</span>
                       <p className="address-name-line">
@@ -917,30 +983,31 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
                       <p className="address-copy">{address.line}</p>
                     </div>
                     <div className="address-row-actions">
-                      <button className="address-row-menu" type="button" onClick={() => setOpenAddressMenu(openAddressMenu === index ? null : index)} aria-label="Address actions">
+                      <button className="address-row-menu" type="button" onClick={() => setOpenAddressMenu(openAddressMenu === originalIndex ? null : originalIndex)} aria-label="Address actions">
                         <span />
                         <span />
                         <span />
                       </button>
-                      {openAddressMenu === index ? (
+                      {openAddressMenu === originalIndex ? (
                         <div className="address-action-menu">
-                          <button type="button" onClick={() => editAddressDraft(index)}>Edit</button>
-                          <button type="button" onClick={() => deleteAddressDraft(index)}>Delete</button>
+                          <button type="button" onClick={() => editAddressDraft(originalIndex)}>Edit</button>
+                          <button type="button" onClick={() => deleteAddressDraft(originalIndex)}>Delete</button>
                         </div>
                       ) : null}
                     </div>
                   </article>
                 ))
-            ) : !isAddressFormOpen ? (
-              <article className="address-empty-state">
-                <div className="address-empty-icon">!</div>
-                <div>
-                  <strong>No saved address found</strong>
-                  <p>Add a new address to make checkout faster.</p>
-                </div>
-              </article>
-            ) : null}
-          </div>
+              ) : (
+                <article className="address-empty-state">
+                  <div className="address-empty-icon">!</div>
+                  <div>
+                    <strong>No saved address found</strong>
+                    <p>Add a new address to make checkout faster.</p>
+                  </div>
+                </article>
+              )}
+            </div>
+          ) : null}
         </section>
       );
     }
@@ -998,7 +1065,7 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
     }
 
     return (
-      <form className="customer-profile-panel" onSubmit={handleProfileSave}>
+      <form className="customer-profile-panel" ref={profilePanelRef} onSubmit={handleProfileSave}>
         <div className="profile-form-main">
           <div className="profile-panel-head">
             <div>
@@ -1106,7 +1173,9 @@ function CustomerProfilePage({ user, initialSection = "profile" }) {
             />
           </section>
 
-          <button className="primary-button profile-save-button" type="submit">Save profile</button>
+          <button className="primary-button profile-save-button" type="submit" disabled={!hasProfileChanges}>
+            Save profile
+          </button>
         </div>
       </form>
     );

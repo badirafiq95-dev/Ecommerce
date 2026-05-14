@@ -90,7 +90,7 @@ export function AdminPanel() {
 
   useEffect(() => {
     return listenToAuth(async (user) => {
-      if (!user) {
+      if (!user || !getAdminSession()) {
         setAdminSession(false);
         setIsAuthed(false);
         return;
