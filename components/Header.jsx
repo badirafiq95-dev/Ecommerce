@@ -392,7 +392,7 @@ export function Header() {
           onClick={handleSecretAdminTap}
           aria-label={adminShortcutActive ? "Open admin panel" : "Freaking Collectibles logo"}
         >
-          M
+          <img className="brand-logo-image" src="/images/website-logo-mark.png" alt="" aria-hidden="true" />
         </button>
         <Link href="/" aria-label="Freaking Collectibles home" onClick={handleBrandHomeClick}>Freaking Collectibles</Link>
       </div>
